@@ -1,0 +1,2368 @@
+<!-- 
+  本项目基于 辞鱼望江月 的 v1.0 版本修改。
+  原作者小红书号：94170543018
+  修改者：乌雀丛生
+  更新内容：v2.5 修复预设列表缓存问题，强制注入Gemini预设，新增重置预设按钮；v2.4 内置Google Gemini；v2.3 兼容性修复。
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>✧⊹✧⊹ ♡ ⊹✧⊹✧</title>
+    <script src="https://unpkg.com/localforage@1.10.0/dist/localforage.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #e0eee8;
+            --panel-bg-color: #f5f5f5;
+            --primary-text-color: #333;
+            --secondary-text-color: #888;
+            --accent-color: #a3ccc4;
+            --user-bubble-color: #a3ccc4;
+            --ai-bubble-color: #ffffff;
+            --shadow-light: rgba(0, 0, 0, 0.05);
+            --shadow-strong: rgba(0, 0, 0, 0.1);
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            
+            --reader-bg: #fdfcfa;
+            --reader-font-color: #333;
+            --reader-font-size: 17px;
+            --reader-comment-color: #a3ccc4;
+            --reader-user-comment-color: #f7c5a8;
+            --reader-highlight-color: rgba(163, 204, 196, 0.3);
+            --reader-user-highlight-color: rgba(247, 197, 168, 0.3);
+            --chat-bg-image: none;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { margin: 0; padding: 0; height: 100%; max-height: -webkit-fill-available; font-family: var(--font-family); background-color: var(--bg-color); color: var(--primary-text-color); font-size: 16px; overflow: hidden; }
+
+        .app-container { display: flex; flex-direction: column; height: 100%; width: 100%; max-width: 500px; margin: 0 auto; background-color: var(--panel-bg-color); box-shadow: 0 4px 15px var(--shadow-strong); position: relative; overflow: hidden; }
+
+        .view-container { flex-grow: 1; position: relative; overflow: hidden; }
+        .view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--panel-bg-color); display: flex; flex-direction: column; transition: transform 0.3s ease-in-out; z-index: 1; transform: translateX(100%); }
+        .view.active { transform: translateX(0); z-index: 2; }
+
+        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background-color: #fff; box-shadow: 0 2px 5px var(--shadow-light); z-index: 10; flex-shrink: 0; }
+        .top-bar .title { font-weight: 600; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .top-bar .icon-btn { padding: 5px; background: none; border: none; cursor: pointer; }
+        .top-bar .icon-btn svg { width: 24px; height: 24px; fill: var(--secondary-text-color); }
+        .top-bar .right-icons { display: flex; gap: 10px; }
+
+        #chat-view .chat-area { 
+            flex-grow: 1; 
+            overflow-y: auto; 
+            padding: 15px;
+            background-image: var(--chat-bg-image);
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        .message-wrapper { display: flex; flex-direction: column; }
+        .message-wrapper.user { align-items: flex-end; }
+        .message-wrapper.ai { align-items: flex-start; }
+        .message-wrapper.system { align-items: center; }
+        .message-container { display: flex; flex-direction: column; gap: 15px; width: 100%; }
+        .message { display: flex; align-items: flex-start; gap: 10px; max-width: 85%; }
+        .message.user { flex-direction: row-reverse; }
+        .message.system { background-color: #e0e0e0; color: var(--secondary-text-color); font-size: 12px; padding: 5px 10px; border-radius: 15px; max-width: 90%; text-align: center; cursor: pointer; white-space: pre-wrap; }
+        .avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; box-shadow: 0 1px 3px var(--shadow-strong); cursor: pointer; transition: transform 0.2s ease; }
+        .avatar:active { transform: scale(0.95); }
+        .message .avatar { margin-top: 5px; }
+        .message-content { padding: 10px 15px; border-radius: 18px; box-shadow: 0 1px 2px var(--shadow-light); word-wrap: break-word; overflow-wrap: break-word; cursor: pointer; }
+        .message.user .message-content { background-color: var(--user-bubble-color); color: #000; border-top-right-radius: 5px; }
+        .message.ai .message-content { background-color: var(--ai-bubble-color); border-top-left-radius: 5px; }
+        .message-content .quote { border-left: 3px solid var(--accent-color); padding-left: 10px; margin: 0 0 8px; font-style: italic; color: var(--secondary-text-color); font-size: 0.9em; }
+        .timestamp { font-size: 12px; color: var(--secondary-text-color); margin: 4px 50px 0; max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out, margin 0.3s ease-out; opacity: 0; text-align: center; }
+        .message-wrapper.show-timestamp .timestamp { max-height: 20px; margin-top: 4px; opacity: 1; }
+        .typing-indicator { display: flex; align-items: center; gap: 5px; padding: 10px 15px; background-color: var(--ai-bubble-color); border-radius: 18px; border-top-left-radius: 5px; box-shadow: 0 1px 2px var(--shadow-light); }
+        .typing-indicator .dot { width: 8px; height: 8px; background-color: #ccc; border-radius: 50%; animation: typing-blink 1.4s infinite both; }
+        .typing-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing-blink { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
+        #chat-view .input-area { display: flex; align-items: center; padding: 10px 15px; background-color: #fff; flex-shrink: 0; }
+        .input-field { flex-grow: 1; border: none; background-color: var(--panel-bg-color); border-radius: 20px; padding: 10px 15px; font-size: 16px; outline: none; margin-right: 10px; }
+        .send-btn { background-color: var(--accent-color); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px var(--shadow-light); transition: background-color 0.2s; border: none; cursor: pointer; padding: 0; }
+        .send-btn svg { fill: white; width: 24px; height: 24px; }
+
+        #reader-view { background: var(--reader-bg); background-size: cover; background-position: center; position: relative; }
+        .reader-content-wrapper { flex-grow: 1; overflow-y: auto; position: relative; -webkit-overflow-scrolling: touch; }
+        .reader-content { line-height: 1.8; font-size: var(--reader-font-size); text-align: justify; padding: 20px 35px; color: var(--reader-font-color); min-height: 100%; }
+        .reader-content p { margin: 0 0 1em; position: relative; white-space: pre-wrap; }
+        .upload-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; color: var(--secondary-text-color); }
+        .upload-placeholder svg { width: 50px; height: 50px; fill: #ccc; margin-bottom: 15px; }
+        .upload-placeholder button { margin-top: 20px; }
+        .reader-btn { background-color: var(--accent-color); color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-size: 14px; box-shadow: 0 2px 5px var(--shadow-light); }
+
+        .comment-highlight { background-color: var(--reader-highlight-color); }
+        .user-highlight { background-color: var(--reader-user-highlight-color); }
+        .comment-icon { position: absolute; right: -25px; bottom: 0; transform: translateY(50%); width: 20px; height: 20px; border-radius: 50%; cursor: pointer; box-shadow: 0 1px 4px var(--shadow-strong); display: flex; align-items: center; justify-content: center; z-index: 5; }
+        .comment-icon.ai { background-color: var(--reader-comment-color); }
+        .comment-icon.user { background-color: var(--reader-user-comment-color); }
+        .comment-icon svg { width: 12px; height: 12px; fill: white; }
+        .comment-icon.thinking .dot { width: 4px; height: 4px; background-color: white; border-radius: 50%; animation: typing-blink 1.4s infinite both; }
+        .comment-icon.thinking { display: flex; gap: 1px; }
+        .comment-icon.thinking .dot:nth-child(2) { animation-delay: 0.2s; }
+        .comment-icon.thinking .dot:nth-child(3) { animation-delay: 0.4s; }
+        
+        .comment-popup { 
+            position: absolute; 
+            background-color: #ffffff;
+            color: var(--primary-text-color);
+            border: 1px solid #eee;
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px var(--shadow-strong); 
+            padding: 12px 15px; 
+            font-size: 14px; 
+            line-height: 1.5; 
+            max-width: 250px; 
+            min-width: 100px; 
+            z-index: 200; 
+            transition: opacity 0.2s, transform 0.2s; 
+            opacity: 0; 
+            visibility: hidden; 
+            word-wrap: break-word; 
+        }
+        .comment-popup.show { opacity: 1; visibility: visible; }
+        .comment-popup .comment-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .comment-popup .comment-header .avatar { width: 24px; height: 24px; box-shadow: none; }
+        .comment-popup .comment-header .name { font-weight: 600; font-size: 13px; }
+        .comment-popup .comment-body { padding-top: 8px; border-top: 1px solid #eee; cursor: pointer; }
+        .comment-popup .comment-body:first-child { padding-top: 0; border-top: none; }
+
+        #selection-menu {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            color: white;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            display: flex;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+            transform: translate(-50%, -100%);
+        }
+        #selection-menu.show { 
+            opacity: 1; 
+            visibility: visible;
+            transform: translate(-50%, 0);
+        }
+        #selection-menu button { background: none; border: none; color: white; padding: 12px 20px; font-size: 15px; cursor: pointer; }
+        #selection-menu button:not(:last-child) { border-right: 1px solid rgba(255, 255, 255, 0.2); }
+        #selection-menu button:active { background-color: rgba(255, 255, 255, 0.1); }
+
+        #user-comment-modal, #summary-modal, #book-list-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;
+            z-index: 300; opacity: 0; visibility: hidden; transition: opacity 0.2s;
+        }
+        #user-comment-modal.show, #summary-modal.show { 
+            opacity: 1; visibility: visible; align-items: flex-start; padding-top: 20px;
+        }
+        #book-list-modal.show {
+            opacity: 1; visibility: visible;
+        }
+        .comment-modal-content, .summary-modal-content, .book-list-modal-content { background-color: white; padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); display: flex; flex-direction: column; max-height: 80vh; }
+        .comment-modal-content h4, .summary-modal-content h4, .book-list-modal-content h4 { margin-top: 0; }
+        .comment-modal-content textarea { width: 100%; min-height: 80px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; font-size: 16px; margin-bottom: 15px; resize: vertical; }
+        .comment-modal-buttons, .summary-modal-buttons, .book-list-modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; flex-shrink: 0; }
+        
+        #book-list { flex-grow: 1; overflow-y: auto; margin: 0 -10px; padding: 0 10px; }
+        .book-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 5px; border-bottom: 1px solid #eee; }
+        .book-item:last-child { border-bottom: none; }
+        .book-item-title { flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 10px; }
+        .book-item-actions { flex-shrink: 0; }
+        .book-item-actions button { margin-left: 8px; font-size: 13px; padding: 5px 12px; }
+        .book-item-actions .delete-btn { background-color: #e57373; }
+
+        .summary-list { flex-grow: 1; overflow-y: auto; margin: 0 -10px; padding: 0 10px; }
+        .summary-item { margin-bottom: 15px; }
+        .summary-item label { font-weight: 600; display: block; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .summary-item textarea { width: 100%; min-height: 60px; border: 1px solid #ddd; border-radius: 8px; padding: 8px; font-size: 14px; resize: vertical; }
+        .summary-item .ai-gen-btn { font-size: 12px; padding: 3px 8px; margin-left: 10px; background-color: #cce3de; border: none; border-radius: 10px; cursor: pointer; }
+        .summary-options { border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px; flex-shrink: 0; }
+        .summary-options .form-item { display: flex; align-items: center; justify-content: space-between; }
+        .summary-options label { margin-bottom: 0; }
+        .summary-options input[type="checkbox"] { width: 20px; height: 20px; }
+
+        #summary-progress-modal {
+            position: fixed;
+            bottom: 70px;
+            right: 15px;
+            width: 280px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px var(--shadow-strong);
+            z-index: 400;
+            overflow: hidden;
+            transition: opacity 0.3s, transform 0.3s;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(20px);
+            pointer-events: none;
+        }
+        #summary-progress-modal.show { opacity: 1; visibility: visible; transform: translateY(0); pointer-events: auto; }
+        .summary-progress-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background-color: #f7f7f7; border-bottom: 1px solid #eee; }
+        .summary-progress-header h5 { margin: 0; font-size: 14px; }
+        .summary-progress-header .toggle-btn { background: none; border: none; cursor: pointer; padding: 5px; }
+        .summary-progress-header .toggle-btn svg { width: 18px; height: 18px; fill: var(--secondary-text-color); transition: transform 0.2s; }
+        .summary-progress-content { padding: 15px; font-size: 14px; line-height: 1.6; max-height: 150px; overflow-y: auto; transition: max-height 0.3s, padding 0.3s; }
+        #summary-progress-modal.collapsed .summary-progress-content { max-height: 0; padding-top: 0; padding-bottom: 0; }
+        #summary-progress-modal.collapsed .toggle-btn svg { transform: rotate(180deg); }
+        #summary-progress-modal.collapsed .summary-progress-header { border-bottom: none; }
+
+        .toc-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.3); z-index: 80; opacity: 0; visibility: hidden; transition: opacity 0.3s ease; }
+        .toc-overlay.show { opacity: 1; visibility: visible; }
+        .toc-panel { position: absolute; top: 0; left: 0; width: 80%; height: 100%; background-color: #fff; box-shadow: 2px 0 10px rgba(0,0,0,0.1); transform: translateX(-100%); transition: transform 0.3s ease; z-index: 90; display: flex; flex-direction: column; }
+        .toc-panel.show { transform: translateX(0); }
+        .toc-header { padding: 15px; font-size: 18px; font-weight: 600; border-bottom: 1px solid var(--panel-bg-color); flex-shrink: 0; }
+        .toc-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex-grow: 1; }
+        .toc-list li { padding: 15px 20px; border-bottom: 1px solid #f0f0f0; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .toc-list li:hover { background-color: var(--panel-bg-color); }
+        .toc-list li.active { color: var(--accent-color); font-weight: bold; }
+
+        #settings-view { z-index: 150; }
+        .settings-header { display: flex; align-items: center; padding: 10px 15px; background-color: #fff; box-shadow: 0 2px 5px var(--shadow-light); flex-shrink: 0; }
+        .settings-header h2 { margin: 0; font-size: 18px; flex-grow: 1; text-align: center; transform: translateX(-12px); }
+        .settings-content { flex-grow: 1; overflow-y: auto; padding: 20px; background-color: var(--bg-color); }
+        .settings-group { background-color: #fff; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px var(--shadow-light); }
+        .settings-group h3 { margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid var(--panel-bg-color); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .form-item { margin-bottom: 15px; }
+        .form-item label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; }
+        .form-item input, .form-item select, .form-item textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background-color: var(--panel-bg-color); font-size: 16px; font-family: var(--font-family); outline-color: var(--accent-color); }
+        .form-item textarea { resize: vertical; min-height: 80px; }
+        .avatar-setting { display: flex; align-items: center; gap: 15px; }
+        .avatar-setting .avatar { width: 60px; height: 60px; }
+        .avatar-setting button, .form-item button.inline-btn { background-color: var(--accent-color); color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-size: 14px; }
+        .form-item button.danger-btn { background-color: #e57373; }
+        .form-item button.sync-btn { background-color: #888; margin-left: auto; display: block; margin-top: -35px; margin-bottom: 15px; font-size: 12px; }
+        .settings-footer { padding: 20px; background-color: #fff; box-shadow: 0 -2px 5px var(--shadow-light); }
+        .save-btn { width: 100%; padding: 15px; background-color: var(--accent-color); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 10px var(--shadow-strong); }
+        .theme-customization { display: flex; gap: 20px; }
+        .theme-controls { flex: 1; }
+        .theme-preview { flex: 1; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background-size: cover; background-position: center; }
+        .theme-preview p { font-size: var(--preview-font-size, 12px); line-height: 1.5; margin: 0; }
+        .theme-preview .preview-highlight, .theme-preview .preview-user-highlight { padding: 1px; border-radius: 2px; }
+        input[type="color"] { padding: 0; height: 30px; width: 50px; border: 1px solid #ddd; border-radius: 5px; cursor: pointer; }
+        .font-size-control { display: flex; align-items: center; gap: 10px; }
+        .font-size-control input[type="range"] { flex-grow: 1; }
+        .font-size-control span { font-size: 14px; min-width: 20px; text-align: right; }
+
+        .preset-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
+        .preset-tag { background-color: #f0f0f0; border: 1px solid #ddd; padding: 5px 10px; border-radius: 15px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .preset-tag:hover { background-color: #e0e0e0; }
+        .preset-tag .delete-preset { width: 14px; height: 14px; background: #ccc; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1; margin-left: 2px; }
+        .preset-tag .delete-preset:hover { background: #e57373; }
+        
+        .bottom-nav { display: flex; background-color: #fff; box-shadow: 0 -2px 5px var(--shadow-light); flex-shrink: 0; z-index: 20; height: 60px; }
+        .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 0; cursor: pointer; color: var(--secondary-text-color); transition: color 0.2s; }
+        .nav-item svg { width: 24px; height: 24px; fill: currentColor; margin-bottom: 2px; }
+        .nav-item .label { font-size: 12px; }
+        .nav-item.active { color: var(--accent-color); }
+        
+        .reader-progress-container {
+            position: fixed;
+            bottom: 60px;
+            left: 0;
+            width: 100%;
+            z-index: 100;
+            pointer-events: none;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        .reader-progress-bar {
+            width: 100%;
+            height: 3px;
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+        
+        .reader-progress-fill {
+            height: 100%;
+            background-color: var(--accent-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .reader-status-bar {
+            position: absolute;
+            bottom: 3px;
+            left: 0;
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 8px 15px;
+            font-size: 12px;
+            color: var(--secondary-text-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 -1px 3px var(--shadow-light);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            transform: translateY(100%);
+            opacity: 0;
+            pointer-events: auto;
+        }
+        
+        .reader-status-bar.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .reader-status-bar .chapter-info {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 10px;
+        }
+        
+        .reader-status-bar .progress-info {
+            flex-shrink: 0;
+            font-weight: 600;
+        }
+        
+        input[type="file"] { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container" id="app-container">
+        <div class="view-container">
+            <div id="chat-view" class="view active">
+                <header class="top-bar">
+                    <div style="width: 34px;"></div>
+                    <div class="title" id="chat-title">伴侣</div>
+                    <button class="icon-btn" id="settings-btn" title="设置"><svg viewBox="0 0 24 24"><path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L2.34,18.73C2.46,18.95 2.73,19.03 2.95,18.95L5.44,17.94C5.96,18.34 6.5,18.68 7.13,18.93L7.5,21.58C7.54,21.82 7.75,22 8,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" /></svg></button>
+                </header>
+                <main class="chat-area" id="chat-area"><div class="message-container" id="message-container"></div></main>
+                <footer class="input-area">
+                    <input type="text" id="message-input" class="input-field" placeholder="说点什么...">
+                    <button class="send-btn" id="send-btn"><svg viewBox="0 0 24 24"><path d="M2,21L23,12L2,3V10L17,12L2,14V21Z" /></svg></button>
+                </footer>
+            </div>
+
+            <div id="reader-view" class="view">
+                <header class="top-bar">
+                    <button class="icon-btn" id="toc-btn" title="目录"><svg viewBox="0 0 24 24"><path d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z" /></svg></button>
+                    <div class="title" id="book-title">阅读</div>
+                    <div class="right-icons">
+                        <button class="icon-btn" id="summary-btn" title="章节摘要"><svg viewBox="0 0 24 24"><path d="M14 17H16V19H14V17M14 15H16V10H14V15M20 2H4C2.9 2 2 2.9 2 4V20C2 21.1 2.9 22 4 22H20C21.1 22 22 21.1 22 20V4C22 2.9 21.1 2 20 2M12 9H8V5H12V9M20 20H4V4H20V20Z"/></svg></button>
+                        <button class="icon-btn" id="change-book-btn" title="书架"><svg viewBox="0 0 24 24"><path d="M13,3V9H21V3M13,21H21V11H13M3,21H11V15H3M3,13H11V3H3V13Z"/></svg></button>
+                    </div>
+                </header>
+                <div class="reader-content-wrapper" id="reader-content-wrapper">
+                    <main class="reader-content" id="reader-content"></main>
+                </div>
+                <div class="toc-overlay" id="toc-overlay"></div>
+                <div class="toc-panel" id="toc-panel">
+                    <div class="toc-header">目录</div>
+                    <ul class="toc-list" id="toc-list"></ul>
+                </div>
+            </div>
+
+            <div id="settings-view" class="view">
+                <header class="settings-header">
+                    <button class="icon-btn" id="settings-back-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z" /></svg></button>
+                    <h2>设置</h2>
+                </header>
+                <div class="settings-content">
+                    
+                    <div class="settings-group">
+                        <h3>聊天 API</h3>
+                        <div class="form-item">
+                            <label>配置预设 <button id="reset-presets-btn" class="inline-btn" style="font-size: 12px; padding: 2px 8px; margin-left: 8px; background-color: #eee; color: #666;">恢复默认</button></label>
+                            <div class="preset-container" id="preset-container">
+                                <!-- Presets will be loaded here -->
+                            </div>
+                            <button class="inline-btn" id="save-preset-btn" style="font-size: 12px; padding: 4px 10px;">将当前保存为预设</button>
+                        </div>
+                        <div class="form-item">
+                            <label for="api-url">API URL (Base URL)</label>
+                            <input id="api-url" list="api-url-list" placeholder="输入或选择 API Base URL">
+                            <datalist id="api-url-list">
+                                <option value="https://api.openai.com/v1">OpenAI Official</option>
+                                <option value="https://generativelanguage.googleapis.com/v1beta/openai">Google Gemini (OpenAI兼容)</option>
+                                <option value="https://api.siliconflow.cn/v1">硅基流动 (SiliconFlow)</option>
+                                <option value="https://api.deepseek.com">DeepSeek Official</option>
+                                <option value="https://openrouter.ai/api/v1">OpenRouter</option>
+                                <option value="https://api.moonshot.cn/v1">Kimi (Moonshot)</option>
+                            </datalist>
+                        </div>
+                        <div class="form-item"><label for="api-key">API Key</label><input type="password" id="api-key" placeholder="请输入你的API Key"></div>
+                        <div class="form-item">
+                            <label for="api-model">模型 (Model)</label>
+                            <input type="text" id="api-model" placeholder="手动输入或拉取后选择">
+                            <select id="api-model-select" style="display:none; width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #ddd; border-radius: 8px; background-color: #fff;">
+                                <option value="" disabled selected>请选择模型...</option>
+                            </select>
+                            <div style="display: flex; gap: 10px; margin-top: 8px;">
+                                <button id="fetch-models-btn" class="inline-btn">拉取模型列表</button>
+                                <button id="test-connection-btn" class="inline-btn" style="background-color: #81c784;">测试连接</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3>摘要 API <button class="inline-btn sync-btn" id="sync-api-btn">同聊天配置</button></h3>
+                        <div class="form-item">
+                            <label for="summary-api-url">API URL</label>
+                            <input id="summary-api-url" list="api-url-list" placeholder="输入或选择 API URL">
+                        </div>
+                        <div class="form-item"><label for="summary-api-key">API Key</label><input type="password" id="summary-api-key" placeholder="用于摘要的API Key (可选)"></div>
+                        <div class="form-item"><label for="summary-api-model">模型 (Model)</label><input type="text" id="summary-api-model" placeholder="用于摘要的模型 (可选)"></div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3>伴侣设定</h3>
+                        <div class="form-item"><label for="ai-name">姓名</label><input type="text" id="ai-name"></div>
+                        <div class="form-item"><label for="ai-pat-suffixes">拍一拍后缀（多条用换行分隔）</label><textarea id="ai-pat-suffixes" rows="3" placeholder="例如：
+的脑袋
+的小手
+的肩膀并说你好呀
+的耳朵说悄悄话"></textarea></div>
+                        <div class="form-item avatar-setting"><img id="ai-avatar-setting" src="" alt="AI Avatar" class="avatar"><button onclick="document.getElementById('ai-avatar-input').click()">更换头像</button></div>
+                        <div class="form-item"><label>聊天气泡</label><input type="color" id="ai-bubble-color-input"></div>
+                        <div class="form-item"><label for="ai-prompt">人设 (Prompt)</label><textarea id="ai-prompt" placeholder=""></textarea></div>
+                    </div>
+                    <div class="settings-group">
+                        <h3>用户设定</h3>
+                        <div class="form-item"><label for="user-name">姓名</label><input type="text" id="user-name"></div>
+                        <div class="form-item"><label for="user-pat-suffixes">自我拍一拍后缀（多条用换行分隔）</label><textarea id="user-pat-suffixes" rows="3" placeholder="例如：
+的脸颊
+的肩膀加油
+的小肚子"></textarea></div>
+                        <div class="form-item avatar-setting"><img id="user-avatar-setting" src="" alt="User Avatar" class="avatar"><button onclick="document.getElementById('user-avatar-input').click()">更换头像</button></div>
+                        <div class="form-item"><label>聊天气泡</label><input type="color" id="user-bubble-color-input"></div>
+                        <div class="form-item"><label>聊天背景</label><button class="inline-btn" onclick="document.getElementById('chat-bg-input').click()">更换聊天背景</button></div>
+                    </div>
+                    <div class="settings-group">
+                        <h3>主题定制</h3>
+                        <div class="theme-customization">
+                            <div class="theme-controls">
+                                <div class="form-item"><label>背景颜色</label><input type="color" id="reader-bg-color"></div>
+                                <div class="form-item"><label>字体颜色</label><input type="color" id="reader-font-color"></div>
+                                <div class="form-item"><label>伴侣注释颜色</label><input type="color" id="reader-comment-color"></div>
+                                <div class="form-item"><label>用户注释颜色</label><input type="color" id="reader-user-comment-color"></div>
+                                <div class="form-item">
+                                    <label>字体大小</label>
+                                    <div class="font-size-control">
+                                        <input type="range" id="reader-font-size" min="12" max="24" step="1">
+                                        <span id="font-size-value">17</span>
+                                    </div>
+                                </div>
+                                <div class="form-item"><label>背景图片</label><button class="inline-btn" style="font-size: 12px; padding: 5px 10px;" onclick="document.getElementById('reader-bg-image-input').click()">上传</button></div>
+                            </div>
+                            <div class="theme-preview" id="theme-preview">
+                                <p id="theme-preview-text">这里是<span class="preview-highlight">伴侣预览</span>文字，<br>这是<span class="preview-user-highlight">用户预览</span>文字。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <h3>阅读设置</h3>
+                        <div class="form-item">
+                            <label for="book-encoding">书籍编码</label>
+                            <select id="book-encoding">
+                                <option value="UTF-8">UTF-8 (通用)</option>
+                                <option value="GBK">GBK (中文旧编码)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <h3>数据管理</h3>
+                        <div class="form-item">
+                            <label>聊天记录</label>
+                            <button id="clear-chat-btn" class="inline-btn danger-btn">清除聊天记录</button>
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center; margin: 20px 0; font-size: 12px; color: #aaa;">
+                        Base project by @辞鱼望江月 | Mod by @乌雀丛生
+                    </div>
+                </div>
+                <footer class="settings-footer"><button id="save-settings-btn" class="save-btn">保存设置</button></footer>
+            </div>
+        </div>
+
+        <nav class="bottom-nav">
+            <div class="nav-item active" data-view="chat-view"><svg viewBox="0 0 24 24"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2M20 16H5.2L4 17.2V4H20V16Z"/></svg><span class="label">聊天</span></div>
+            <div class="nav-item" data-view="reader-view"><svg viewBox="0 0 24 24"><path d="M18,22A2,2 0 0,0 20,20V4A2,2 0 0,0 18,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18M11,4H13V16L11,14.5L9,16V4H11Z"/></svg><span class="label">阅读</span></div>
+        </nav>
+    </div>
+    
+    <!-- 阅读进度条容器 - 放在body内，作为全局元素 -->
+    <div class="reader-progress-container" id="reader-progress-container">
+        <div class="reader-progress-bar">
+            <div class="reader-progress-fill" id="reader-progress-fill"></div>
+        </div>
+        <div class="reader-status-bar" id="reader-status-bar">
+            <div class="chapter-info" id="chapter-info">未选择书籍</div>
+            <div class="progress-info" id="progress-info">0%</div>
+        </div>
+    </div>
+    
+    <input type="file" id="book-file-input" accept=".txt">
+    <input type="file" id="ai-avatar-input" accept="image/*">
+    <input type="file" id="user-avatar-input" accept="image/*">
+    <input type="file" id="reader-bg-image-input" accept="image/*">
+    <input type="file" id="chat-bg-input" accept="image/*">
+
+    <div id="selection-menu">
+        <button id="menu-add-note">记录想法</button>
+        <button id="menu-ask-ai">询问伴侣</button>
+    </div>
+
+    <div id="user-comment-modal">
+        <div class="comment-modal-content">
+            <h4>记录你的想法</h4>
+            <textarea id="user-comment-input" placeholder="在这里输入..."></textarea>
+            <div class="comment-modal-buttons">
+                <button id="cancel-comment-btn" class="reader-btn" style="background-color: #aaa;">取消</button>
+                <button id="save-comment-btn" class="reader-btn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="summary-modal">
+        <div class="summary-modal-content">
+            <h4>章节摘要</h4>
+            <div class="summary-list" id="summary-list"></div>
+            <div class="summary-options">
+                <div class="form-item">
+                    <label for="auto-summary-toggle">上传新书时自动生成摘要</label>
+                    <input type="checkbox" id="auto-summary-toggle">
+                </div>
+            </div>
+            <div class="summary-modal-buttons">
+                <button id="close-summary-btn" class="reader-btn" style="background-color: #aaa;">关闭</button>
+                <button id="save-summary-btn" class="reader-btn">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="book-list-modal">
+        <div class="book-list-modal-content">
+            <h4>书架</h4>
+            <div id="book-list"></div>
+            <div class="book-list-modal-buttons">
+                 <button id="add-book-btn" class="reader-btn">添加新书</button>
+                 <button id="close-book-list-btn" class="reader-btn" style="background-color: #aaa;">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="summary-progress-modal">
+        <div class="summary-progress-header">
+            <h5 id="summary-progress-title">生成摘要</h5>
+            <button class="toggle-btn" id="summary-progress-toggle">
+                <svg viewBox="0 0 24 24"><path d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z"/></svg>
+            </button>
+        </div>
+        <div class="summary-progress-content" id="summary-progress-content"></div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const dom = {
+            appContainer: document.getElementById('app-container'),
+            views: document.querySelectorAll('.view'),
+            navItems: document.querySelectorAll('.nav-item'),
+            chatArea: document.getElementById('chat-area'),
+            messageContainer: document.getElementById('message-container'),
+            messageInput: document.getElementById('message-input'),
+            sendBtn: document.getElementById('send-btn'),
+            chatTitle: document.getElementById('chat-title'),
+            readerView: document.getElementById('reader-view'),
+            readerContentWrapper: document.getElementById('reader-content-wrapper'),
+            readerContent: document.getElementById('reader-content'),
+            bookTitle: document.getElementById('book-title'),
+            changeBookBtn: document.getElementById('change-book-btn'),
+            summaryBtn: document.getElementById('summary-btn'),
+            tocBtn: document.getElementById('toc-btn'),
+            tocPanel: document.getElementById('toc-panel'),
+            tocOverlay: document.getElementById('toc-overlay'),
+            tocList: document.getElementById('toc-list'),
+            settingsView: document.getElementById('settings-view'),
+            settingsBtn: document.getElementById('settings-btn'),
+            settingsBackBtn: document.getElementById('settings-back-btn'),
+            saveSettingsBtn: document.getElementById('save-settings-btn'),
+            apiUrl: document.getElementById('api-url'), apiKey: document.getElementById('api-key'), apiModel: document.getElementById('api-model'),
+            summaryApiUrl: document.getElementById('summary-api-url'), summaryApiKey: document.getElementById('summary-api-key'), summaryApiModel: document.getElementById('summary-api-model'),
+            syncApiBtn: document.getElementById('sync-api-btn'),
+            presetContainer: document.getElementById('preset-container'),
+            savePresetBtn: document.getElementById('save-preset-btn'),
+            resetPresetsBtn: document.getElementById('reset-presets-btn'),
+            fetchModelsBtn: document.getElementById('fetch-models-btn'),
+            testConnectionBtn: document.getElementById('test-connection-btn'),
+            apiModelSelect: document.getElementById('api-model-select'),
+            aiName: document.getElementById('ai-name'), aiPatSuffixes: document.getElementById('ai-pat-suffixes'), aiPrompt: document.getElementById('ai-prompt'),
+            aiAvatarInput: document.getElementById('ai-avatar-input'), aiBubbleColorInput: document.getElementById('ai-bubble-color-input'),
+            userName: document.getElementById('user-name'), userPatSuffixes: document.getElementById('user-pat-suffixes'), userAvatarInput: document.getElementById('user-avatar-input'),
+            userBubbleColorInput: document.getElementById('user-bubble-color-input'),
+            chatBgInput: document.getElementById('chat-bg-input'),
+            aiAvatarSetting: document.getElementById('ai-avatar-setting'), userAvatarSetting: document.getElementById('user-avatar-setting'),
+            bookFileInput: document.getElementById('book-file-input'),
+            readerBgColor: document.getElementById('reader-bg-color'),
+            readerFontColor: document.getElementById('reader-font-color'),
+            readerCommentColor: document.getElementById('reader-comment-color'),
+            readerUserCommentColor: document.getElementById('reader-user-comment-color'),
+            readerFontSize: document.getElementById('reader-font-size'),
+            fontSizeValue: document.getElementById('font-size-value'),
+            readerBgImageInput: document.getElementById('reader-bg-image-input'),
+            bookEncoding: document.getElementById('book-encoding'),
+            themePreview: document.getElementById('theme-preview'),
+            themePreviewText: document.getElementById('theme-preview-text'),
+            selectionMenu: document.getElementById('selection-menu'),
+            menuAddNote: document.getElementById('menu-add-note'),
+            menuAskAi: document.getElementById('menu-ask-ai'),
+            userCommentModal: document.getElementById('user-comment-modal'),
+            userCommentInput: document.getElementById('user-comment-input'),
+            saveCommentBtn: document.getElementById('save-comment-btn'),
+            cancelCommentBtn: document.getElementById('cancel-comment-btn'),
+            summaryModal: document.getElementById('summary-modal'),
+            summaryList: document.getElementById('summary-list'),
+            autoSummaryToggle: document.getElementById('auto-summary-toggle'),
+            saveSummaryBtn: document.getElementById('save-summary-btn'),
+            closeSummaryBtn: document.getElementById('close-summary-btn'),
+            clearChatBtn: document.getElementById('clear-chat-btn'),
+            summaryProgressModal: document.getElementById('summary-progress-modal'),
+            summaryProgressTitle: document.getElementById('summary-progress-title'),
+            summaryProgressContent: document.getElementById('summary-progress-content'),
+            summaryProgressToggle: document.getElementById('summary-progress-toggle'),
+            bookListModal: document.getElementById('book-list-modal'),
+            bookList: document.getElementById('book-list'),
+            addBookBtn: document.getElementById('add-book-btn'),
+            closeBookListBtn: document.getElementById('close-book-list-btn'),
+            readerProgressContainer: document.getElementById('reader-progress-container'),
+            readerProgressFill: document.getElementById('reader-progress-fill'),
+            readerStatusBar: document.getElementById('reader-status-bar'),
+            chapterInfo: document.getElementById('chapter-info'),
+            progressInfo: document.getElementById('progress-info'),
+        };
+
+        const DEFAULT_PRESETS = [
+            { name: 'SiliconFlow', url: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3' },
+            { name: 'DeepSeek', url: 'https://api.deepseek.com', model: 'deepseek-chat' },
+            { name: 'Moonshot', url: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
+            { name: 'Google Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.0-flash-exp' },
+            { name: 'OpenRouter', url: 'https://openrouter.ai/api/v1', model: 'google/gemini-2.0-flash-exp:free' }
+        ];
+
+        let state = {
+            settings: {
+                apiUrl: 'https://api.siliconflow.cn/v1', apiKey: '', apiModel: 'deepseek-ai/DeepSeek-V3',
+                summaryApiUrl: 'https://api.siliconflow.cn/v1', summaryApiKey: '', summaryApiModel: 'deepseek-ai/DeepSeek-V3',
+                apiPresets: [...DEFAULT_PRESETS],
+                aiName: '伴侣', aiPatSuffixes: ['的脑袋', '的小手', '的肩膀并说你好呀', '的耳朵说悄悄话'], aiPrompt: '你是一个温柔的伴侣，喜欢在阅读时分享自己的见解。',
+                aiAvatar: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZmlsbD0iI2FjY2NjNCIvPjxwYXRoIGQ9Ik01MCAyMUMzMi45IDIxIDIxIDMyLjkgMjEgNTBjMCAxMS40IDUuOSAyMS4yIDE0LjggMjYuNkM0MC4yIDc5LjUgNDUgODIgNTAgODJzOS44LTIuNSAxNC4yLTUuNEM3My4xIDcxLjIgNzkgNjEuNCA3OSA1MCA3OSAzMi45IDY3LjEgMjEgNTAgMjF6TTUwIDY4Yy05LjkgMC0xOC04LjEtMTgtMThzOC4xLTE4IDE4LTE4IDE4IDguMSAxOCAxOCA4LjEgMTggMTggMTh6IiBmaWxsPSIjZmZmIi8+PC9zdmc+',
+                aiBubbleColor: '#ffffff',
+                userName: '我', userPatSuffixes: ['的脸颊', '的肩膀加油', '的小肚子'], userAvatar: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZmlsbD0iI2Y1ZjVmNSIvPjxwYXRoIGQ9Ik01MCAyMUMzMi45IDIxIDIxIDMyLjkgMjEgNTBjMCAxMS40IDUuOSAyMS4yIDE0LjggMjYuNkM0MC4yIDc5LjUgNDUgODIgNTAgODJzOS44LTIuNSAxNC4yLTUuNEM3My4xIDcxLjIgNzkgNjEuNCA3OSA1MCA3OSAzMi45IDY3LjEgMjEgNTAgMjF6TTUwIDY4Yy05LjkgMC0xOC04LjEtMTgtMThzOC4xLTE4IDE4LTE4IDE4IDguMSAxOCAxOCA4LjEgMTggMTggMTh6IiBmaWxsPSIjY2NjY2NjIi8+PC9zdmc+',
+                userBubbleColor: '#a3ccc4',
+                chatBgImage: 'none',
+                theme: {
+                    readerBg: '#fdfcfa',
+                    readerFontColor: '#333333',
+                    readerFontSize: '17',
+                    readerCommentColor: '#a3ccc4',
+                    readerUserCommentColor: '#f7c5a8',
+                    readerBgImage: 'none',
+                },
+                reading: {
+                    bookEncoding: 'GBK',
+                    autoGenerateSummaries: false,
+                }
+            },
+            // ... (rest of state remains same)
+            books: {},
+            activeBookId: null,
+            summaries: {},
+            chat: {
+                history: [],
+                lastMessageTimestamp: 0,
+            },
+            isAiTyping: false,
+            reading: {
+                lastCommentTime: 0,
+                lastPatTime: 0,
+                lastScrollTop: 0,
+                scrollTimeout: null,
+                statusBarTimeout: null,
+                isStatusBarVisible: false,
+            },
+            longPressTimer: null,
+            selection: {
+                range: null,
+                text: '',
+            }
+        };
+        
+        const debounce = (func, delay) => {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        };
+
+        // ... (getActiveBook, updateReadingProgress, showStatusBar, hideStatusBar, switchView) ...
+        const getActiveBook = () => state.activeBookId ? state.books[state.activeBookId] : null;
+
+        const updateReadingProgress = () => {
+            const activeBook = getActiveBook();
+            if (!activeBook) {
+                dom.chapterInfo.textContent = '未选择书籍';
+                dom.progressInfo.textContent = '0%';
+                dom.readerProgressFill.style.width = '0%';
+                hideStatusBar();
+                return;
+            }
+
+            const { scrollTop, scrollHeight, clientHeight } = dom.readerContentWrapper;
+            const totalScrollHeight = scrollHeight - clientHeight;
+            const progress = totalScrollHeight > 0 ? Math.min(100, Math.max(0, (scrollTop / totalScrollHeight) * 100)) : 0;
+            
+            dom.readerProgressFill.style.width = `${progress}%`;
+            dom.progressInfo.textContent = `${Math.round(progress)}%`;
+            
+            let currentChapterTitle = '书籍开头';
+            for (let i = activeBook.toc.length - 1; i >= 0; i--) {
+                const tocItem = activeBook.toc[i];
+                const anchor = document.getElementById(`para-id-${tocItem.paraIndex}`);
+                if (anchor && scrollTop >= anchor.offsetTop - clientHeight / 2) {
+                    currentChapterTitle = tocItem.title;
+                    break;
+                }
+            }
+            activeBook.currentChapter = currentChapterTitle;
+            dom.chapterInfo.textContent = currentChapterTitle;
+            showStatusBar();
+        };
+
+        const showStatusBar = () => {
+            if (state.reading.isStatusBarVisible) return;
+            dom.readerStatusBar.classList.add('show');
+            state.reading.isStatusBarVisible = true;
+            clearTimeout(state.reading.statusBarTimeout);
+            state.reading.statusBarTimeout = setTimeout(() => hideStatusBar(), 3000);
+        };
+
+        const hideStatusBar = () => {
+            if (!state.reading.isStatusBarVisible) return;
+            dom.readerStatusBar.classList.remove('show');
+            state.reading.isStatusBarVisible = false;
+        };
+
+        const switchView = async (viewId) => {
+            if (document.querySelector('.view.active')?.id === 'reader-view' && viewId !== 'reader-view') {
+                await saveCurrentBookProgress();
+                hideStatusBar();
+            }
+            dom.views.forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            dom.navItems.forEach(item => item.classList.toggle('active', item.dataset.view === viewId));
+            if (viewId !== 'reader-view') {
+                hideSelectionMenu();
+                dom.readerProgressContainer.style.display = 'none';
+            } else {
+                dom.readerProgressContainer.style.display = 'block';
+                setTimeout(updateReadingProgress, 100);
+            }
+        };
+        const showSettings = () => dom.settingsView.classList.add('active');
+        const hideSettings = () => dom.settingsView.classList.remove('active');
+
+        const saveSettings = async () => {
+            try {
+                state.settings.apiUrl = dom.apiUrl.value.replace(/\/$/, ''); 
+                state.settings.apiKey = dom.apiKey.value; 
+                state.settings.apiModel = dom.apiModel.value;
+                state.settings.summaryApiUrl = dom.summaryApiUrl.value.replace(/\/$/, '');
+                state.settings.summaryApiKey = dom.summaryApiKey.value; 
+                state.settings.summaryApiModel = dom.summaryApiModel.value;
+                state.settings.aiName = dom.aiName.value; 
+                state.settings.aiPatSuffixes = dom.aiPatSuffixes.value.split('\n').filter(s => s.trim()).map(s => s.trim());
+                state.settings.aiPrompt = dom.aiPrompt.value;
+                state.settings.aiAvatar = dom.aiAvatarSetting.src;
+                state.settings.aiBubbleColor = dom.aiBubbleColorInput.value;
+                state.settings.userName = dom.userName.value; 
+                state.settings.userPatSuffixes = dom.userPatSuffixes.value.split('\n').filter(s => s.trim()).map(s => s.trim());
+                state.settings.userAvatar = dom.userAvatarSetting.src;
+                state.settings.userBubbleColor = dom.userBubbleColorInput.value;
+                state.settings.theme.readerBg = dom.readerBgColor.value;
+                state.settings.theme.readerFontColor = dom.readerFontColor.value;
+                state.settings.theme.readerCommentColor = dom.readerCommentColor.value;
+                state.settings.theme.readerUserCommentColor = dom.readerUserCommentColor.value;
+                state.settings.theme.readerFontSize = dom.readerFontSize.value;
+                state.settings.reading.bookEncoding = dom.bookEncoding.value;
+                state.settings.reading.autoGenerateSummaries = dom.autoSummaryToggle.checked;
+                await localforage.setItem('readingCompanionSettings', state.settings);
+                applySettings();
+                addSystemMessage('设置已保存');
+                hideSettings();
+            } catch (e) { console.error('Error saving settings:', e); addSystemMessage(`保存设置失败: ${e.message}`); }
+        };
+
+        const renderPresets = () => {
+            dom.presetContainer.innerHTML = '';
+            if (!state.settings.apiPresets) state.settings.apiPresets = [];
+            state.settings.apiPresets.forEach((preset, index) => {
+                const tag = document.createElement('div');
+                tag.className = 'preset-tag';
+                tag.innerHTML = `${preset.name} <span class="delete-preset" data-index="${index}">×</span>`;
+                tag.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('delete-preset')) {
+                        e.stopPropagation();
+                        if(confirm(`删除预设 "${preset.name}"?`)) {
+                            state.settings.apiPresets.splice(index, 1);
+                            renderPresets();
+                        }
+                    } else {
+                        dom.apiUrl.value = preset.url;
+                        dom.apiModel.value = preset.model;
+                        addSystemMessage(`已加载预设: ${preset.name}`, true);
+                    }
+                });
+                dom.presetContainer.appendChild(tag);
+            });
+        };
+
+        const handleSavePreset = () => {
+            const url = dom.apiUrl.value.trim();
+            const model = dom.apiModel.value.trim();
+            if (!url || !model) {
+                alert('请填写API URL和模型名称');
+                return;
+            }
+            const name = prompt('请输入预设名称:', model.split('/').pop());
+            if (name) {
+                if (!state.settings.apiPresets) state.settings.apiPresets = [];
+                state.settings.apiPresets.push({ name, url, model });
+                renderPresets();
+            }
+        };
+
+        const handleResetPresets = async () => {
+            if (confirm('确定要重置预设列表吗？这将恢复默认的API配置（包含Google Gemini）。')) {
+                state.settings.apiPresets = [...DEFAULT_PRESETS];
+                await saveSettings();
+                renderPresets();
+            }
+        };
+        
+        const syncApiSettings = () => {
+            dom.summaryApiUrl.value = dom.apiUrl.value;
+            dom.summaryApiKey.value = dom.apiKey.value;
+            dom.summaryApiModel.value = dom.apiModel.value;
+            addSystemMessage('已将聊天配置同步至摘要配置', true);
+        };
+
+        // ... (handleFetchModels, handleTestConnection) ...
+        const handleFetchModels = async () => {
+            const url = dom.apiUrl.value.replace(/\/$/, '');
+            const key = dom.apiKey.value;
+
+            if (!url || !key) {
+                alert('请先填写 API URL 和 API Key');
+                return;
+            }
+
+            const originalBtnText = dom.fetchModelsBtn.textContent;
+            dom.fetchModelsBtn.textContent = '拉取中...';
+            dom.fetchModelsBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${url}/models`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${key}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                const models = Array.isArray(data) ? data : (data.data || []);
+
+                dom.apiModelSelect.innerHTML = '<option value="" disabled selected>请选择模型...</option>'; // Reset
+                if (models.length === 0) {
+                    alert('未获取到模型列表');
+                } else {
+                    models.forEach(m => {
+                        const option = document.createElement('option');
+                        option.value = m.id;
+                        option.textContent = m.id;
+                        dom.apiModelSelect.appendChild(option);
+                    });
+                    dom.apiModelSelect.style.display = 'block';
+                    alert(`成功拉取 ${models.length} 个模型，请在下方下拉框中选择`);
+                }
+
+            } catch (e) {
+                console.error(e);
+                alert(`拉取失败: ${e.message}\n\n提示：部分API服务商（如Google）可能不支持/models接口，请手动输入模型名称。`);
+            } finally {
+                dom.fetchModelsBtn.textContent = originalBtnText;
+                dom.fetchModelsBtn.disabled = false;
+            }
+        };
+
+        const handleTestConnection = async () => {
+            const url = dom.apiUrl.value.replace(/\/$/, '');
+            const key = dom.apiKey.value;
+            const model = dom.apiModel.value;
+
+            if (!url || !key || !model) {
+                alert('请先填写完整 API URL, Key 和 模型名称');
+                return;
+            }
+
+            const originalBtnText = dom.testConnectionBtn.textContent;
+            dom.testConnectionBtn.textContent = '测试中...';
+            dom.testConnectionBtn.disabled = true;
+            
+            const startTime = Date.now();
+
+            try {
+                const response = await fetch(`${url}/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${key}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [{ role: 'user', content: 'test' }],
+                        max_tokens: 1
+                    })
+                });
+
+                const endTime = Date.now();
+                const duration = endTime - startTime;
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(`HTTP ${response.status} ${errorData.error?.message || response.statusText}`);
+                }
+
+                alert(`✅ 连接成功！\n延迟: ${duration}ms\n模型: ${model} 响应正常。`);
+
+            } catch (e) {
+                console.error(e);
+                alert(`❌ 连接失败:\n${e.message}\n\n请检查 URL、Key 是否正确，或是否存在跨域问题。`);
+            } finally {
+                dom.testConnectionBtn.textContent = originalBtnText;
+                dom.testConnectionBtn.disabled = false;
+            }
+        };
+
+        const loadSettings = async () => {
+            const savedSettings = await localforage.getItem('readingCompanionSettings');
+            if (savedSettings) {
+                try {
+                    const parsed = savedSettings;
+                    if (parsed.aiPatSuffix && !parsed.aiPatSuffixes) {
+                        parsed.aiPatSuffixes = [parsed.aiPatSuffix];
+                        delete parsed.aiPatSuffix;
+                    }
+                    if (parsed.userPatSuffix && !parsed.userPatSuffixes) {
+                        parsed.userPatSuffixes = [parsed.userPatSuffix];
+                        delete parsed.userPatSuffix;
+                    }
+                    
+                    const mergedSettings = { ...state.settings, ...parsed };
+                    
+                    // Force inject Google Gemini preset if missing (Migration Logic)
+                    if (mergedSettings.apiPresets) {
+                        const googleUrl = 'https://generativelanguage.googleapis.com/v1beta/openai';
+                        const hasGoogle = mergedSettings.apiPresets.some(p => p.url === googleUrl);
+                        if (!hasGoogle) {
+                            mergedSettings.apiPresets.push({ name: 'Google Gemini', url: googleUrl, model: 'gemini-2.0-flash-exp' });
+                        }
+                    }
+
+                    mergedSettings.theme = { ...state.settings.theme, ...(parsed.theme || {}) };
+                    mergedSettings.reading = { ...state.settings.reading, ...(parsed.reading || {}) };
+                    state.settings = mergedSettings;
+                }
+                catch (e) {
+                    console.error('Error loading saved settings:', e);
+                    await localforage.removeItem('readingCompanionSettings');
+                }
+            }
+            applySettings();
+        };
+
+        const applySettings = () => {
+            const root = document.documentElement;
+            
+            dom.apiUrl.value = state.settings.apiUrl; dom.apiKey.value = state.settings.apiKey; dom.apiModel.value = state.settings.apiModel;
+            dom.summaryApiUrl.value = state.settings.summaryApiUrl; dom.summaryApiKey.value = state.settings.summaryApiKey; dom.summaryApiModel.value = state.settings.summaryApiModel;
+            renderPresets();
+            
+            dom.aiName.value = state.settings.aiName; 
+            dom.aiPatSuffixes.value = state.settings.aiPatSuffixes.join('\n');
+            dom.aiPrompt.value = state.settings.aiPrompt;
+            dom.aiAvatarSetting.src = state.settings.aiAvatar;
+            dom.aiBubbleColorInput.value = state.settings.aiBubbleColor;
+            dom.userName.value = state.settings.userName; 
+            dom.userPatSuffixes.value = state.settings.userPatSuffixes.join('\n');
+            dom.chatTitle.textContent = state.settings.aiName;
+            dom.userAvatarSetting.src = state.settings.userAvatar;
+            dom.userBubbleColorInput.value = state.settings.userBubbleColor;
+            
+            document.querySelectorAll('.avatar[data-sender="ai"]').forEach(el => el.src = state.settings.aiAvatar);
+            document.querySelectorAll('.avatar[data-sender="user"]').forEach(el => el.src = state.settings.userAvatar);
+
+            root.style.setProperty('--user-bubble-color', state.settings.userBubbleColor);
+            root.style.setProperty('--ai-bubble-color', state.settings.aiBubbleColor);
+            root.style.setProperty('--chat-bg-image', state.settings.chatBgImage !== 'none' ? `url(${state.settings.chatBgImage})` : 'none');
+
+            dom.readerBgColor.value = state.settings.theme.readerBg;
+            dom.readerFontColor.value = state.settings.theme.readerFontColor;
+            dom.readerCommentColor.value = state.settings.theme.readerCommentColor;
+            dom.readerUserCommentColor.value = state.settings.theme.readerUserCommentColor;
+            dom.readerFontSize.value = state.settings.theme.readerFontSize;
+            dom.fontSizeValue.textContent = state.settings.theme.readerFontSize;
+            dom.bookEncoding.value = state.settings.reading.bookEncoding;
+            dom.autoSummaryToggle.checked = state.settings.reading.autoGenerateSummaries;
+            
+            root.style.setProperty('--reader-bg', state.settings.theme.readerBgImage !== 'none' ? `url(${state.settings.theme.readerBgImage})` : state.settings.theme.readerBg);
+            root.style.setProperty('--reader-font-color', state.settings.theme.readerFontColor);
+            root.style.setProperty('--reader-font-size', `${state.settings.theme.readerFontSize}px`);
+            
+            const setHighlightColor = (varName, colorValue) => {
+                const highlightColor = colorValue.startsWith('#') ? `${colorValue}4D` : `rgba(${parseInt(colorValue.slice(1,3),16)}, ${parseInt(colorValue.slice(3,5),16)}, ${parseInt(colorValue.slice(5,7),16)}, 0.3)`;
+                root.style.setProperty(varName, highlightColor);
+            };
+            root.style.setProperty('--reader-comment-color', state.settings.theme.readerCommentColor);
+            setHighlightColor('--reader-highlight-color', state.settings.theme.readerCommentColor);
+            root.style.setProperty('--reader-user-comment-color', state.settings.theme.readerUserCommentColor);
+            setHighlightColor('--reader-user-highlight-color', state.settings.theme.readerUserCommentColor);
+
+            updateThemePreview();
+        };
+
+        const updateThemePreview = () => {
+            dom.themePreview.style.backgroundColor = dom.readerBgColor.value;
+            dom.themePreview.style.backgroundImage = state.settings.theme.readerBgImage !== 'none' ? `url(${state.settings.theme.readerBgImage})` : 'none';
+            dom.themePreview.style.color = dom.readerFontColor.value;
+            dom.themePreview.querySelector('.preview-highlight').style.backgroundColor = `${dom.readerCommentColor.value}4D`;
+            dom.themePreview.querySelector('.preview-user-highlight').style.backgroundColor = `${dom.readerUserCommentColor.value}4D`;
+            dom.themePreviewText.style.fontSize = `${dom.readerFontSize.value / 17 * 12}px`;
+            dom.fontSizeValue.textContent = dom.readerFontSize.value;
+        };
+
+
+        const addMessage = (sender, content, { timestamp = Date.now(), addToHistory = false, fromStorage = false, internal = false } = {}) => {
+            removeTypingIndicator();
+            const wrapper = document.createElement('div');
+            wrapper.className = `message-wrapper ${sender}`;
+            wrapper.dataset.timestamp = timestamp;
+
+            const messageEl = document.createElement('div');
+            messageEl.classList.add('message', sender);
+            
+            const tsDate = new Date(timestamp);
+            const timeString = `${(tsDate.getMonth() + 1).toString().padStart(2, '0')}-${tsDate.getDate().toString().padStart(2, '0')} ${tsDate.getHours().toString().padStart(2, '0')}:${tsDate.getMinutes().toString().padStart(2, '0')}`;
+
+            if (sender === 'user' || sender === 'ai') {
+                const avatarSrc = sender === 'user' ? state.settings.userAvatar : state.settings.aiAvatar;
+                messageEl.innerHTML = `<img src="${avatarSrc}" class="avatar" data-sender="${sender}" onclick="handleAvatarClick('${sender}')"><div class="message-content">${content}</div>`;
+            } else {
+                messageEl.textContent = content;
+            }
+            wrapper.appendChild(messageEl);
+            
+            if (timestamp - state.chat.lastMessageTimestamp > 5 * 60 * 1000) {
+                const timeEl = document.createElement('div');
+                timeEl.className = 'timestamp';
+                timeEl.textContent = timeString;
+                wrapper.insertBefore(timeEl, messageEl);
+                wrapper.classList.add('show-timestamp');
+            }
+            state.chat.lastMessageTimestamp = timestamp;
+
+            const clickableEl = messageEl.querySelector('.message-content') || messageEl;
+            
+            clickableEl.addEventListener('click', () => {
+                if (sender !== 'system') {
+                    let timeEl = wrapper.querySelector('.timestamp');
+                    if (!timeEl) {
+                        timeEl = document.createElement('div');
+                        timeEl.className = 'timestamp';
+                        timeEl.textContent = timeString;
+                        wrapper.insertBefore(timeEl, messageEl);
+                    }
+                    wrapper.classList.toggle('show-timestamp');
+                }
+            });
+            
+            clickableEl.addEventListener('mousedown', (e) => {
+                if (e.button === 2) return;
+                state.longPressTimer = setTimeout(() => handleDeleteMessage(wrapper), 800);
+            });
+            clickableEl.addEventListener('mouseup', () => clearTimeout(state.longPressTimer));
+            clickableEl.addEventListener('mouseleave', () => clearTimeout(state.longPressTimer));
+            clickableEl.addEventListener('touchstart', () => {
+                state.longPressTimer = setTimeout(() => handleDeleteMessage(wrapper), 800);
+            });
+            clickableEl.addEventListener('touchend', () => clearTimeout(state.longPressTimer));
+            clickableEl.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                handleDeleteMessage(wrapper);
+            });
+            
+            dom.messageContainer.appendChild(wrapper);
+            if (!fromStorage) {
+                dom.chatArea.scrollTop = dom.chatArea.scrollHeight;
+            }
+
+            if (addToHistory) {
+                const historyEntry = { sender, content, timestamp, internal };
+                state.chat.history.push(historyEntry);
+                saveChatHistory();
+            }
+        };
+
+        const handleDeleteMessage = async (wrapper) => {
+            const timestamp = wrapper.dataset.timestamp;
+            if (!timestamp) return;
+
+            if (confirm('是否删除此消息？')) {
+                state.chat.history = state.chat.history.filter(msg => msg.timestamp.toString() !== timestamp);
+                await saveChatHistory();
+                wrapper.remove();
+            }
+        };
+        
+        const addSystemMessage = (text, internal = false) => addMessage('system', text, { addToHistory: true, internal });
+
+        const showTypingIndicator = () => {
+            if (state.isAiTyping) return;
+            state.isAiTyping = true;
+            const indicatorContainer = document.createElement('div');
+            indicatorContainer.id = 'typing-indicator-container';
+            indicatorContainer.className = 'message ai';
+            indicatorContainer.innerHTML = `<img src="${state.settings.aiAvatar}" class="avatar" data-sender="ai"><div class="typing-indicator"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message-wrapper ai';
+            wrapper.appendChild(indicatorContainer);
+            dom.messageContainer.appendChild(wrapper);
+            dom.chatArea.scrollTop = dom.chatArea.scrollHeight;
+        };
+        const removeTypingIndicator = () => { document.getElementById('typing-indicator-container')?.parentElement.remove(); state.isAiTyping = false; };
+
+        const handleSendMessage = () => {
+            const text = dom.messageInput.value.trim();
+            if (!text) return;
+
+            addMessage('user', text, { addToHistory: true });
+            dom.messageInput.value = '';
+            getChatResponse({ userMessage: text });
+        };
+
+        // ... (callAIApi, getChatResponse, saveChatHistory, loadChatHistory, clearChatHistory) ...
+        const callAIApi = async (messages, apiType = 'chat') => {
+            const useSummaryApi = apiType === 'summary' && state.settings.summaryApiModel && state.settings.summaryApiKey;
+            let apiUrl = useSummaryApi ? state.settings.summaryApiUrl : state.settings.apiUrl;
+            const apiKey = useSummaryApi ? state.settings.summaryApiKey : state.settings.apiKey;
+            const apiModel = useSummaryApi ? state.settings.summaryApiModel : state.settings.apiModel;
+
+            if (!apiKey || !apiModel) {
+                const errorMsg = `请先在设置中填写${useSummaryApi ? '摘要' : '聊天'} API Key和模型`;
+                return { error: errorMsg };
+            }
+            
+            // Normalize URL: Remove trailing slash if present
+            apiUrl = apiUrl.replace(/\/$/, '');
+            
+            // Construct the endpoint. Most compatible APIs (OpenAI, DeepSeek, SiliconFlow, OneAPI) use /chat/completions
+            let endpoint = `${apiUrl}/chat/completions`;
+            
+            // Handle cases where user puts /v1 in the base URL or not. 
+            // Standard practice: Input Base URL (e.g., https://api.openai.com/v1), append /chat/completions.
+            // If user input https://api.openai.com, we might need /v1/chat/completions, but standard usually expects the full base including version if needed, or we rely on the provider.
+            // For this implementation, we assume the user provides the Base URL that precedes /chat/completions.
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: apiModel,
+                        messages: messages,
+                        stream: false
+                    })
+                });
+
+                if (!response.ok) {
+                    let errorMessage = `API请求失败: HTTP ${response.status} ${response.statusText}`;
+                    try {
+                        const errorBody = await response.json();
+                        const detail = errorBody.error?.message || errorBody.message || JSON.stringify(errorBody);
+                        errorMessage += `\n详情: ${detail}`;
+                    } catch (jsonError) {
+                        try {
+                            const textBody = await response.text();
+                            errorMessage += `\n响应内容: ${textBody.substring(0, 200)}${textBody.length > 200 ? '...' : ''}`;
+                        } catch (textError) {
+                            errorMessage += '\n(无法读取错误响应体)';
+                        }
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                const data = await response.json();
+                if (!data.choices || data.choices.length === 0 || !data.choices[0].message?.content) {
+                    throw new Error('API返回了无效或空的响应');
+                }
+                return { content: data.choices[0].message.content };
+
+            } catch (error) {
+                console.error('AI call failed:', error);
+                const finalError = (error instanceof Error) ? error.message : String(error);
+                
+                if (finalError.includes('Failed to fetch')) {
+                    return { error: `网络错误: 无法连接到API服务器(${apiUrl})。\n请检查网络连接、API URL或是否存在跨域(CORS)问题。\n提示: 原生浏览器中直接调用OpenAI等官方API可能会遇到跨域限制，建议使用OneAPI等代理或本地中转。` };
+                }
+                return { error: finalError };
+            }
+        };
+
+        const getChatResponse = async ({ userMessage, onComplete = null, silent = false }) => {
+            if (!silent) showTypingIndicator();
+            
+            const now = new Date();
+            const timeInfo = `另外，请注意，现在的时间是${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日，${now.getHours()}点。`;
+
+            let basePrompt = `${state.settings.aiPrompt}\n你的名字是${state.settings.aiName}。`;
+            const activeBook = getActiveBook();
+            if (activeBook?.title) {
+                basePrompt += `\n我们正在一起阅读《${activeBook.title}》。`;
+                if (activeBook.currentChapter) {
+                    basePrompt += ` 目前我们读到了"${activeBook.currentChapter}"附近。`;
+                }
+            }
+            
+            const rulePrompt = `***绝对核心规则***: 你的输出必须是纯粹的语言内容。**绝对禁止** 任何形式的动作描写。**绝对禁止** 在回复中包含任何括号、方括号或星号。你的回答必须简洁，大约在50个字以内。`;
+            const patRule = `特殊指令说明：如果用户发来'__PAT_...'，这代表一个"拍一拍"事件，请根据事件的含义做出自然的回应。不要在你的回复中重复或提及'__PAT_...'指令本身。`;
+
+            const systemPrompt = { role: 'system', content: `${basePrompt}\n${rulePrompt}\n${patRule}\n${timeInfo}` };
+            
+            const apiHistory = state.chat.history
+                .filter(m => !m.internal && (m.sender === 'user' || m.sender === 'ai'))
+                .slice(-10)
+                .map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.content.replace(/<[^>]*>?/gm, '') }));
+
+            const messages = [systemPrompt, ...apiHistory];
+            if(userMessage) messages.push({ role: 'user', content: userMessage });
+
+            const { content: aiResponse, error } = await callAIApi(messages, 'chat');
+            
+            if (!silent) removeTypingIndicator();
+            if (error) {
+                addSystemMessage(`AI响应失败: ${error}`);
+                return;
+            }
+
+            if (aiResponse) {
+                const finalResponse = aiResponse.replace(/__PAT_[\w-]+__/g, '').trim();
+                if (!silent) {
+                    addMessage('ai', finalResponse, { addToHistory: true });
+                }
+                if (onComplete) onComplete(finalResponse);
+            }
+        };
+
+        const saveChatHistory = async () => {
+            await localforage.setItem('readingCompanionChat', state.chat.history);
+        };
+        const loadChatHistory = async () => {
+            const savedChat = await localforage.getItem('readingCompanionChat');
+            if (savedChat) {
+                try {
+                    state.chat.history = savedChat;
+                    dom.messageContainer.innerHTML = '';
+                    state.chat.lastMessageTimestamp = 0;
+                    state.chat.history.forEach(msg => addMessage(msg.sender, msg.content, { timestamp: msg.timestamp, fromStorage: true, internal: msg.internal }));
+                    dom.chatArea.scrollTop = dom.chatArea.scrollHeight;
+                } catch (e) {
+                    console.error('Error loading chat history:', e);
+                    await localforage.removeItem('readingCompanionChat');
+                }
+            }
+        };
+        const clearChatHistory = async () => {
+            if (confirm('确定要清除所有聊天记录吗？此操作不可恢复。')) {
+                state.chat.history = [];
+                state.chat.lastMessageTimestamp = 0;
+                await localforage.removeItem('readingCompanionChat');
+                dom.messageContainer.innerHTML = '';
+                addSystemMessage('聊天记录已清除');
+            }
+        };
+
+        const handleFileUpload = (event) => {
+            const file = event.target.files[0];
+            if (!file || !file.name.endsWith('.txt')) {
+                addSystemMessage('请上传.txt格式的文件');
+                event.target.value = '';
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const bookId = `book-${Date.now()}`;
+                const bookTitle = file.name.replace(/\.txt$/i, '');
+                
+                const newBook = {
+                    id: bookId,
+                    title: bookTitle,
+                    paragraphs: e.target.result.split('\n'),
+                    toc: [],
+                    currentChapter: '',
+                    comments: {},
+                    lastScrollTop: 0,
+                };
+                
+                state.books[bookId] = newBook;
+                state.activeBookId = bookId;
+                await localforage.setItem('books', state.books);
+                await localforage.setItem('lastActiveBookId', bookId);
+
+                generateTOC();
+                displayBookContent();
+                
+                hideBookListModal();
+                switchView('reader-view');
+                addSystemMessage(`开始阅读《${bookTitle}》`);
+
+                if (state.settings.reading.autoGenerateSummaries) {
+                    await generateAllSummaries(bookTitle);
+                } else {
+                    confirmSummaryGeneration(bookTitle);
+                }
+            };
+            const encoding = state.settings.reading.bookEncoding || 'GBK';
+            reader.readAsText(file, encoding);
+            event.target.value = '';
+        };
+        
+        const loadBook = async (bookId) => {
+            if (!state.books[bookId]) return;
+            state.activeBookId = bookId;
+            await localforage.setItem('lastActiveBookId', bookId);
+            displayBookContent();
+            hideBookListModal();
+            switchView('reader-view');
+        };
+
+        const deleteBook = async (bookId) => {
+            if (!state.books[bookId]) return;
+            const bookTitle = state.books[bookId].title;
+            if (confirm(`确定要删除《${bookTitle}》吗？`)) {
+                delete state.books[bookId];
+                delete state.summaries[bookTitle];
+
+                if (state.activeBookId === bookId) {
+                    state.activeBookId = null;
+                    await localforage.removeItem('lastActiveBookId');
+                    displayBookContent();
+                }
+                
+                await localforage.setItem('books', state.books);
+                await localforage.setItem('readingCompanionSummaries', state.summaries);
+                renderBookList();
+            }
+        };
+
+        const confirmSummaryGeneration = (bookTitle) => {
+            setTimeout(() => {
+                if (confirm(`是否为《${bookTitle}》生成章节摘要？`)) {
+                    generateAllSummaries(bookTitle);
+                }
+            }, 100);
+        };
+
+        const displayBookContent = () => {
+            const activeBook = getActiveBook();
+            if (!activeBook) {
+                dom.bookTitle.textContent = '阅读';
+                dom.readerContent.innerHTML = `<div class="upload-placeholder"><svg viewBox="0 0 24 24"><path d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z" /></svg><p>书架空空如也</p><button id="upload-book-btn-placeholder" class="reader-btn">去书架添加第一本书</button></div>`;
+                dom.tocList.innerHTML = '';
+                return;
+            }
+
+            dom.bookTitle.textContent = activeBook.title;
+            if (!activeBook.toc || (activeBook.toc.length === 0 && activeBook.paragraphs.length > 0)) {
+                generateTOC();
+            }
+
+            dom.readerContent.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+            activeBook.paragraphs.forEach((paraText, index) => {
+                const pEl = document.createElement('p');
+                pEl.dataset.paraId = index;
+                pEl.id = `para-id-${index}`;
+                
+                let paraContent = paraText.trim() || ' ';
+                const comments = activeBook.comments[index];
+
+                if (comments && comments.length > 0) {
+                    const highlights = [];
+                    comments.forEach(comment => {
+                        if (comment.quote) {
+                            const startIndex = paraContent.indexOf(comment.quote);
+                            if (startIndex !== -1) {
+                                highlights.push({
+                                    start: startIndex,
+                                    end: startIndex + comment.quote.length,
+                                    comment: comment
+                                });
+                            }
+                        }
+                    });
+
+                    highlights.sort((a, b) => a.start - b.start);
+                    const uniqueHighlights = [];
+                    let lastEnd = -1;
+                    for (const h of highlights) {
+                        if (h.start >= lastEnd) {
+                            uniqueHighlights.push(h);
+                            lastEnd = h.end;
+                        }
+                    }
+
+                    const contentSpan = document.createElement('span');
+                    let lastIndex = 0;
+                    uniqueHighlights.forEach(h => {
+                        if (h.start > lastIndex) {
+                            contentSpan.appendChild(document.createTextNode(paraContent.substring(lastIndex, h.start)));
+                        }
+                        const highlightSpan = document.createElement('span');
+                        const highlightClass = h.comment.type === 'user' ? 'user-highlight' : 'comment-highlight';
+                        highlightSpan.className = highlightClass;
+                        highlightSpan.dataset.highlightId = h.comment.highlightId;
+                        highlightSpan.textContent = paraContent.substring(h.start, h.end);
+                        contentSpan.appendChild(highlightSpan);
+                        lastIndex = h.end;
+                    });
+
+                    if (lastIndex < paraContent.length) {
+                        contentSpan.appendChild(document.createTextNode(paraContent.substring(lastIndex)));
+                    }
+                    pEl.appendChild(contentSpan);
+
+                } else {
+                    pEl.innerHTML = `<span>${paraContent}</span>`;
+                }
+
+                if (comments && comments.length > 0) {
+                    renderCommentIcons(pEl, comments);
+                }
+                fragment.appendChild(pEl);
+            });
+            dom.readerContent.appendChild(fragment);
+            
+            renderTOC();
+            
+            setTimeout(() => {
+                dom.readerContentWrapper.scrollTop = activeBook.lastScrollTop || 0;
+                updateReadingProgress();
+            }, 0);
+        };
+        
+        const renderCommentIcons = (pElement, comments) => {
+            if (!comments || comments.length === 0) return;
+            const icon = document.createElement('span');
+            icon.className = 'comment-icon';
+            const hasUser = comments.some(c => c.type === 'user');
+            const hasAi = comments.some(c => c.type === 'ai');
+            if (hasUser) icon.classList.add('user');
+            if (hasAi) icon.classList.add('ai');
+            if (!hasUser && hasAi) icon.classList.add('ai');
+            else icon.classList.add('user');
+
+            icon.innerHTML = `<svg viewBox="0 0 24 24"><path d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M6,9H18V11H6V9M14,14H6V12H14V14M18,7H6V5H18V7Z"/></svg>`;
+            pElement.appendChild(icon);
+        };
+
+        const generateTOC = () => {
+            const activeBook = getActiveBook();
+            if (!activeBook || activeBook.paragraphs.length === 0) return;
+            
+            activeBook.toc = [];
+            const chapterRegex = /^(第\s*[一二三四五六七八九十百千万零〇\d]+\s*[章回节卷部])|^(Chapter\s*\d+)/im;
+            
+            activeBook.paragraphs.forEach((paraText, index) => {
+                const trimmedLine = paraText.trim();
+                if (chapterRegex.test(trimmedLine) && trimmedLine.length < 30) {
+                    activeBook.toc.push({ title: trimmedLine, paraIndex: index });
+                }
+            });
+
+            if (activeBook.toc.length === 0 && activeBook.paragraphs.length > 0) {
+                activeBook.toc.push({ title: '书籍开头', paraIndex: 0 });
+            }
+        };
+
+        const renderTOC = () => {
+            const activeBook = getActiveBook();
+            dom.tocList.innerHTML = '';
+            if (!activeBook || !activeBook.toc) return;
+            activeBook.toc.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item.title;
+                li.dataset.paraIndex = item.paraIndex;
+                dom.tocList.appendChild(li);
+            });
+        };
+
+        const toggleTOC = (show) => {
+            dom.tocPanel.classList.toggle('show', show);
+            dom.tocOverlay.classList.toggle('show', show);
+        };
+
+        window.handleAvatarClick = (sender) => {
+            let patter, patted, suffixes, command;
+            
+            if (sender === 'ai') {
+                patter = state.settings.userName; 
+                patted = state.settings.aiName; 
+                suffixes = state.settings.aiPatSuffixes;
+                command = '__PAT_AI__';
+            } else {
+                patter = state.settings.userName; 
+                patted = '自己'; 
+                suffixes = state.settings.userPatSuffixes;
+                command = '__PAT_SELF__';
+            }
+            
+            const randomSuffix = suffixes.length > 0 
+                ? suffixes[Math.floor(Math.random() * suffixes.length)]
+                : (sender === 'ai' ? '的脑袋' : '的脸颊');
+            
+            addSystemMessage(`${patter} 拍了拍 ${patted}${randomSuffix ? ` ${randomSuffix}` : ''}`, true);
+            getChatResponse({ userMessage: command });
+        };
+        
+        const saveCurrentBookProgress = async () => {
+            const activeBook = getActiveBook();
+            if (!activeBook) return;
+            activeBook.lastScrollTop = dom.readerContentWrapper.scrollTop;
+            await localforage.setItem('books', state.books);
+        };
+
+        const handleReaderScroll = () => {
+            hideSelectionMenu();
+            const activeBook = getActiveBook();
+            if (!activeBook) return;
+            
+            const { scrollTop, scrollHeight, clientHeight } = dom.readerContentWrapper;
+            
+            updateReadingProgress();
+
+            clearTimeout(state.reading.scrollTimeout);
+            state.reading.scrollTimeout = setTimeout(() => {
+                saveCurrentBookProgress();
+                const isScrollingDown = scrollTop > state.reading.lastScrollTop;
+                state.reading.lastScrollTop = scrollTop;
+                const now = Date.now();
+                
+                if (isScrollingDown) {
+                    if (now - state.reading.lastCommentTime > 20000 && Math.random() < 0.25) {
+                        triggerAIReadComment();
+                    }
+                    if (now - state.reading.lastPatTime > 30000 && Math.random() < 0.20) {
+                        triggerAIPat();
+                    }
+                }
+            }, 500);
+        };
+
+        const getCommentOnQuote = (quote, pElement) => {
+            const activeBook = getActiveBook();
+            if (!pElement || !activeBook) return;
+
+            const paraId = parseInt(pElement.dataset.paraId, 10);
+            const thinkingIcon = addCommentPlaceholder(pElement, 'ai');
+
+            let currentChapter = { title: '书籍开头', paraIndex: 0 };
+            for (let i = activeBook.toc.length - 1; i >= 0; i--) {
+                if (paraId >= activeBook.toc[i].paraIndex) {
+                    currentChapter = activeBook.toc[i];
+                    break;
+                }
+            }
+
+            const bookSummaries = state.summaries[activeBook.title] || {};
+            const chapterSummary = bookSummaries[currentChapter.title] || '暂无摘要';
+            const contextSnippet = (activeBook.paragraphs.slice(Math.max(0, paraId - 2), paraId + 3).join(' ')).substring(0, 200);
+
+            const userMessage = `
+我们正在一起阅读《${activeBook.title}》。
+当前章节是："${currentChapter.title}"。
+这个章节的摘要是："${chapterSummary}"。
+我注意到了下面这段话，它附近上下文是："...${contextSnippet}..."。
+引用的句子是："${quote}"
+请基于以上信息，对引用的句子发表你的看法。
+            `.trim();
+            
+            getChatResponse({
+                userMessage,
+                silent: true,
+                onComplete: async (aiResponse) => {
+                    if (aiResponse) {
+                        const commentData = { text: aiResponse, type: 'ai', highlightId: thinkingIcon.dataset.highlightId, quote: quote };
+                        const content = `<div class="quote">${quote}</div>${aiResponse}`;
+                        addMessage('ai', content, { addToHistory: true });
+                        await fillCommentPlaceholder(pElement, thinkingIcon, commentData);
+                    } else if (thinkingIcon) {
+                        removeHighlight(thinkingIcon.dataset.highlightId);
+                        thinkingIcon.remove();
+                    }
+                }
+            });
+        };
+
+        const triggerAIReadComment = () => {
+            const activeBook = getActiveBook();
+            if (!activeBook) return;
+            const { scrollTop, clientHeight } = dom.readerContentWrapper;
+            const visibleParagraphs = Array.from(dom.readerContent.querySelectorAll('p')).filter(p => {
+                const pTop = p.offsetTop;
+                const pBottom = pTop + p.offsetHeight;
+                const paraId = p.dataset.paraId;
+                return pTop < scrollTop + clientHeight && pBottom > scrollTop && p.textContent.trim().length > 20 && (!activeBook.comments[paraId] || !activeBook.comments[paraId].find(c => c.type === 'ai'));
+            });
+
+            if (visibleParagraphs.length > 0) {
+                state.reading.lastCommentTime = Date.now();
+                const targetPara = visibleParagraphs[Math.floor(Math.random() * visibleParagraphs.length)];
+                const text = targetPara.textContent.trim();
+                
+                const sentences = text.match(/[^.!?。！？]+[.!?。！？]?/g) || [text];
+                if (sentences.length === 0) return;
+
+                const numSentencesToPick = Math.floor(Math.random() * 3) + 1;
+                const startSentenceIndex = Math.floor(Math.random() * (sentences.length - numSentencesToPick + 1));
+                const quote = sentences.slice(startSentenceIndex, startSentenceIndex + numSentencesToPick).join('').trim();
+
+                if (quote) {
+                    const range = document.createRange();
+                    const textNode = Array.from(targetPara.childNodes).find(node => node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SPAN'));
+                    const innerTextNode = (textNode && textNode.firstChild) ? textNode.firstChild : textNode;
+
+                    if (innerTextNode && innerTextNode.nodeType === Node.TEXT_NODE) {
+                        const startIndex = innerTextNode.textContent.indexOf(quote);
+                        if (startIndex !== -1) {
+                            range.setStart(innerTextNode, startIndex);
+                            range.setEnd(innerTextNode, startIndex + quote.length);
+                            state.selection.range = range;
+                            getCommentOnQuote(quote, targetPara);
+                        }
+                    } else {
+                        state.selection.range = null;
+                        getCommentOnQuote(text, targetPara);
+                    }
+                }
+            }
+        };
+
+        const triggerAIPat = () => {
+            state.reading.lastPatTime = Date.now();
+            let patter, patted, suffixes;
+
+            if (Math.random() < 0.8) {
+                patter = state.settings.aiName;
+                patted = state.settings.userName;
+                suffixes = state.settings.userPatSuffixes;
+            } else {
+                patter = state.settings.aiName;
+                patted = '自己';
+                suffixes = state.settings.aiPatSuffixes;
+            }
+            
+            const randomSuffix = suffixes.length > 0 
+                ? suffixes[Math.floor(Math.random() * suffixes.length)]
+                : (patted === state.settings.userName ? '的脸颊' : '的脑袋');
+            
+            addSystemMessage(`${patter} 拍了拍 ${patted}${randomSuffix ? ` ${randomSuffix}` : ''}`, true);
+        };
+
+        const addCommentToParagraph = async (paraId, commentData) => {
+            const activeBook = getActiveBook();
+            if (!activeBook) return;
+            if (!activeBook.comments[paraId]) {
+                activeBook.comments[paraId] = [];
+            }
+            activeBook.comments[paraId].push(commentData);
+            await localforage.setItem('books', state.books);
+        };
+
+        const addCommentPlaceholder = (pElement, type) => {
+            const highlightClass = type === 'user' ? 'user-highlight' : 'comment-highlight';
+            const highlightId = `highlight-${Date.now()}-${Math.random()}`;
+            
+            if (state.selection.range) {
+                highlightRange(state.selection.range, highlightClass, highlightId);
+            } else {
+                 const span = pElement.querySelector('span');
+                 if(span) {
+                    const newSpan = document.createElement('span');
+                    newSpan.className = highlightClass;
+                    newSpan.dataset.highlightId = highlightId;
+                    newSpan.textContent = span.textContent;
+                    span.parentNode.replaceChild(newSpan, span);
+                 }
+            }
+            
+            let icon = pElement.querySelector('.comment-icon');
+            if (!icon) {
+                icon = document.createElement('span');
+                icon.className = 'comment-icon';
+                pElement.appendChild(icon);
+            }
+            
+            icon.classList.add('thinking', type);
+            icon.dataset.highlightId = highlightId;
+            icon.innerHTML = `<div class="dot"></div><div class="dot"></div><div class="dot"></div>`;
+            
+            return icon;
+        };
+
+        const fillCommentPlaceholder = async (pElement, thinkingIcon, commentData) => {
+            const paraId = pElement.dataset.paraId;
+            await addCommentToParagraph(paraId, commentData);
+            
+            thinkingIcon.classList.remove('thinking');
+            const iconSvg = `<svg viewBox="0 0 24 24"><path d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M6,9H18V11H6V9M14,14H6V12H14V14M18,7H6V5H18V7Z"/></svg>`;
+            thinkingIcon.innerHTML = iconSvg;
+        };
+
+        const showCommentPopup = (targetIcon) => {
+            const activeBook = getActiveBook();
+            if (!activeBook || targetIcon.classList.contains('thinking')) return;
+            const pElement = targetIcon.closest('p');
+            const paraId = pElement.dataset.paraId;
+            const comments = activeBook.comments[paraId];
+            if (!comments || comments.length === 0) return;
+
+            document.querySelector('.comment-popup')?.remove();
+            const popup = document.createElement('div');
+            popup.className = `comment-popup`;
+            
+            let contentHTML = '';
+            comments.forEach((comment, index) => {
+                const avatarSrc = comment.type === 'user' ? state.settings.userAvatar : state.settings.aiAvatar;
+                const name = comment.type === 'user' ? state.settings.userName : state.settings.aiName;
+                contentHTML += `
+                    <div class="comment-body" data-comment-index="${index}" data-para-id="${paraId}">
+                        <div class="comment-header">
+                            <img src="${avatarSrc}" class="avatar">
+                            <span class="name">${name}</span>
+                        </div>
+                        ${comment.text}
+                    </div>
+                `;
+            });
+            popup.innerHTML = contentHTML;
+            
+            dom.readerContentWrapper.appendChild(popup);
+            
+            popup.querySelectorAll('.comment-body').forEach(body => {
+                body.addEventListener('mousedown', (e) => {
+                    if (e.button === 2) return;
+                    state.longPressTimer = setTimeout(() => handleDeleteComment(body), 800);
+                });
+                body.addEventListener('mouseup', () => clearTimeout(state.longPressTimer));
+                body.addEventListener('mouseleave', () => clearTimeout(state.longPressTimer));
+                body.addEventListener('touchstart', () => {
+                    state.longPressTimer = setTimeout(() => handleDeleteComment(body), 800);
+                });
+                body.addEventListener('touchend', () => clearTimeout(state.longPressTimer));
+                body.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    handleDeleteComment(body);
+                });
+            });
+
+            popup.style.visibility = 'hidden';
+            popup.classList.add('show');
+            const { top, left } = calculatePopupPosition(targetIcon, popup);
+            popup.classList.remove('show');
+            popup.style.visibility = 'visible';
+            
+            popup.style.top = `${top}px`;
+            popup.style.left = `${left}px`;
+            setTimeout(() => popup.classList.add('show'), 10);
+        };
+
+        const handleDeleteComment = async (commentBody) => {
+            const activeBook = getActiveBook();
+            if (!activeBook) return;
+            const paraId = commentBody.dataset.paraId;
+            const commentIndex = parseInt(commentBody.dataset.commentIndex, 10);
+            
+            if (confirm('确定要删除这条注释吗？')) {
+                const commentToDelete = activeBook.comments[paraId][commentIndex];
+                const highlightId = commentToDelete.highlightId;
+
+                removeHighlight(highlightId);
+                
+                activeBook.comments[paraId].splice(commentIndex, 1);
+                await localforage.setItem('books', state.books);
+
+                const pElement = document.getElementById(`para-id-${paraId}`);
+                if (pElement && (!activeBook.comments[paraId] || activeBook.comments[paraId].length === 0)) {
+                    const icon = pElement.querySelector('.comment-icon');
+                    if (icon) icon.remove();
+                }
+                
+                hideCommentPopup();
+            }
+        };
+
+        const removeHighlight = (highlightId) => {
+            const highlights = document.querySelectorAll(`[data-highlight-id="${highlightId}"]`);
+            highlights.forEach(span => {
+                if (span.classList.contains('comment-icon')) return;
+                const parent = span.parentNode;
+                while (span.firstChild) {
+                    parent.insertBefore(span.firstChild, span);
+                }
+                parent.removeChild(span);
+                parent.normalize();
+            });
+        };
+
+        const hideCommentPopup = () => {
+            const popup = document.querySelector('.comment-popup');
+            if (popup) {
+                popup.classList.remove('show');
+                setTimeout(() => popup.remove(), 200);
+            }
+        };
+
+        const calculatePopupPosition = (targetElement, popupElement) => {
+            const wrapperRect = dom.readerContentWrapper.getBoundingClientRect();
+            const targetRect = targetElement.getBoundingClientRect();
+            const popupRect = popupElement.getBoundingClientRect();
+            const scrollTop = dom.readerContentWrapper.scrollTop;
+            const margin = 10;
+
+            let top;
+            const topPosition = targetRect.top - wrapperRect.top + scrollTop - popupRect.height - margin;
+            const bottomPosition = targetRect.bottom - wrapperRect.top + scrollTop + margin;
+
+            if (topPosition < scrollTop) {
+                top = bottomPosition;
+            } else {
+                top = topPosition;
+            }
+
+            let left = targetRect.left - wrapperRect.left + targetRect.width / 2 - popupRect.width / 2;
+
+            if (left < margin) { left = margin; }
+            else if (left + popupRect.width > (wrapperRect.width - margin)) { left = wrapperRect.width - popupRect.width - margin; }
+            
+            return { top, left };
+        };
+
+        const showSelectionMenu = () => {
+            const selection = window.getSelection();
+            if (selection.isCollapsed) {
+                hideSelectionMenu();
+                return;
+            }
+            const selectedText = selection.toString().trim();
+
+            if (selectedText.length > 1 && dom.readerContent.contains(selection.anchorNode)) {
+                state.selection.text = selectedText;
+                state.selection.range = selection.getRangeAt(0);
+                dom.selectionMenu.classList.add('show');
+            } else {
+                hideSelectionMenu();
+            }
+        };
+
+        const debouncedShowSelectionMenu = debounce(showSelectionMenu, 500);
+
+        const handleSelectionChange = () => {
+            const selection = window.getSelection();
+            if (selection.isCollapsed) {
+                hideSelectionMenu();
+            } else {
+                debouncedShowSelectionMenu();
+            }
+        };
+
+        const hideSelectionMenu = () => {
+            dom.selectionMenu.classList.remove('show');
+        };
+
+        const showUserCommentModal = () => {
+            hideSelectionMenu();
+            dom.userCommentInput.value = '';
+            dom.userCommentModal.classList.add('show');
+            dom.userCommentInput.focus();
+        };
+
+        const hideUserCommentModal = () => {
+            dom.userCommentModal.classList.remove('show');
+        };
+
+        const highlightRange = (range, highlightClass, highlightId) => {
+            if (range.collapsed) return;
+
+            const allParagraphs = Array.from(dom.readerContent.querySelectorAll('p'));
+            const affectedParagraphs = new Set();
+
+            allParagraphs.forEach(p => {
+                if (range.intersectsNode(p, true)) {
+                    const intersectionRange = range.cloneRange();
+                    intersectionRange.selectNodeContents(p);
+                    
+                    const commonAncestor = range.commonAncestorContainer;
+                    
+                    if (range.startContainer !== p && !p.contains(range.startContainer)) {
+                        intersectionRange.setStart(p, 0);
+                    } else {
+                        intersectionRange.setStart(range.startContainer, range.startOffset);
+                    }
+
+                    if (range.endContainer !== p && !p.contains(range.endContainer)) {
+                        intersectionRange.setEnd(p, p.childNodes.length);
+                    } else {
+                        intersectionRange.setEnd(range.endContainer, range.endOffset);
+                    }
+
+                    const highlightSpan = document.createElement('span');
+                    highlightSpan.className = highlightClass;
+                    highlightSpan.dataset.highlightId = highlightId;
+                    
+                    try {
+                        intersectionRange.surroundContents(highlightSpan);
+                        affectedParagraphs.add(p);
+                    } catch (e) {
+                        console.error("Could not surround contents within a paragraph.", e);
+                    }
+                }
+            });
+            return affectedParagraphs;
+        };
+
+        const saveUserComment = () => {
+            const commentText = dom.userCommentInput.value.trim();
+            if (!commentText) return;
+
+            const range = state.selection.range;
+            if (!range) return;
+
+            const affectedParagraphs = highlightRange(range, 'user-highlight', `highlight-${Date.now()}`);
+            
+            if (affectedParagraphs.size > 0) {
+                const firstP = Array.from(affectedParagraphs)[0];
+                const paraId = firstP.dataset.paraId;
+                const thinkingIcon = addCommentPlaceholder(firstP, 'user', true);
+                const commentData = { text: commentText, type: 'user', highlightId: thinkingIcon.dataset.highlightId, quote: state.selection.text };
+                
+                fillCommentPlaceholder(firstP, thinkingIcon, commentData);
+
+                const userMessageContent = `<div class="quote">${state.selection.text}</div>${commentText}`;
+                addMessage('user', userMessageContent, { addToHistory: true });
+                getChatResponse({ userMessage: `我刚刚对"${state.selection.text}"这段内容发表了评论："${commentText}"。请对此作出回应。` });
+            }
+
+            hideUserCommentModal();
+            setTimeout(() => window.getSelection().removeAllRanges(), 10);
+        };
+        
+        const showSummaryModal = () => {
+            const activeBook = getActiveBook();
+            if (!activeBook) {
+                addSystemMessage('请先加载一本书籍');
+                return;
+            }
+            dom.summaryList.innerHTML = '';
+            const bookSummaries = state.summaries[activeBook.title] || {};
+
+            activeBook.toc.forEach(chapter => {
+                const summaryText = bookSummaries[chapter.title] || '';
+                const item = document.createElement('div');
+                item.className = 'summary-item';
+                item.innerHTML = `
+                    <label>${chapter.title} <button class="ai-gen-btn" data-chapter-title="${chapter.title}" data-para-index="${chapter.paraIndex}">AI生成</button></label>
+                    <textarea data-chapter-title="${chapter.title}" placeholder="输入本章摘要...">${summaryText}</textarea>
+                `;
+                dom.summaryList.appendChild(item);
+            });
+            dom.autoSummaryToggle.checked = state.settings.reading.autoGenerateSummaries;
+            dom.summaryModal.classList.add('show');
+        };
+
+        const hideSummaryModal = () => dom.summaryModal.classList.remove('show');
+
+        const saveSummaries = async (bookTitle) => {
+            const activeBook = getActiveBook();
+            const title = bookTitle || (activeBook ? activeBook.title : null);
+            if (!title) return;
+
+            const textareas = dom.summaryList.querySelectorAll('textarea');
+            if (textareas.length > 0) {
+                if (!state.summaries[title]) state.summaries[title] = {};
+                textareas.forEach(textarea => {
+                    const chapterTitle = textarea.dataset.chapterTitle;
+                    state.summaries[title][chapterTitle] = textarea.value.trim();
+                });
+            }
+
+            await localforage.setItem('readingCompanionSummaries', state.summaries);
+            if (!bookTitle) {
+                addSystemMessage('章节摘要已保存');
+                hideSummaryModal();
+            }
+        };
+
+        const loadSummaries = async () => {
+            const saved = await localforage.getItem('readingCompanionSummaries');
+            if (saved) {
+                try {
+                    state.summaries = saved;
+                } catch (e) {
+                    console.error('Error loading summaries:', e);
+                    state.summaries = {};
+                }
+            }
+        };
+
+        const updateSummaryProgress = (status, message) => {
+            const modal = dom.summaryProgressModal;
+            if (status === 'start') {
+                modal.classList.remove('collapsed');
+                dom.summaryProgressTitle.textContent = '生成摘要';
+                dom.summaryProgressContent.textContent = message;
+                modal.classList.add('show');
+            } else if (status === 'progress') {
+                dom.summaryProgressContent.textContent = message;
+            } else if (status === 'done' || status === 'error') {
+                dom.summaryProgressTitle.textContent = status === 'done' ? '生成完毕' : '出现错误';
+                dom.summaryProgressContent.textContent = message;
+                setTimeout(() => {
+                    modal.classList.remove('show');
+                }, 4000);
+            } else if (status === 'hide') {
+                modal.classList.remove('show');
+            }
+        };
+
+        const generateSummaryForChapter = async (chapterTitle, paraIndex) => {
+            const activeBook = getActiveBook();
+            if (!activeBook) return { success: false, error: "No active book." };
+
+            const bookTitle = activeBook.title;
+            const btn = dom.summaryList.querySelector(`.ai-gen-btn[data-chapter-title="${chapterTitle}"]`);
+            
+            if (btn) {
+                btn.textContent = '生成中...';
+                btn.disabled = true;
+            }
+
+            const nextChapter = activeBook.toc.find(c => c.paraIndex > paraIndex);
+            const endParaIndex = nextChapter ? nextChapter.paraIndex : activeBook.paragraphs.length;
+            const chapterText = activeBook.paragraphs.slice(paraIndex, endParaIndex).join('\n').substring(0, 3000);
+
+            const userMessage = `请为以下书籍《${bookTitle}》中"${chapterTitle}"章节的内容，生成一个50字以内的精简摘要：\n\n${chapterText}`;
+            
+            const { content: summary, error } = await callAIApi([{ role: 'system', content: '你是一个擅长文本摘要的助手。' }, { role: 'user', content: userMessage }], 'summary');
+
+            if (error) {
+                if (btn) alert(`摘要生成失败: ${error}`);
+                if (btn) {
+                    btn.textContent = 'AI生成';
+                    btn.disabled = false;
+                }
+                return { success: false, error };
+            }
+
+            if (summary) {
+                const textarea = dom.summaryList.querySelector(`textarea[data-chapter-title="${chapterTitle}"]`);
+                if (textarea) textarea.value = summary;
+                if (!state.summaries[bookTitle]) state.summaries[bookTitle] = {};
+                state.summaries[bookTitle][chapterTitle] = summary;
+            }
+
+            if (btn) {
+                btn.textContent = 'AI生成';
+                btn.disabled = false;
+            }
+            return { success: true };
+        };
+
+        const generateAllSummaries = async (bookTitle) => {
+            const activeBook = getActiveBook();
+            if (!activeBook || !activeBook.toc || activeBook.toc.length === 0) return;
+
+            const chaptersToGenerate = activeBook.toc.filter(chapter => {
+                const bookSummaries = state.summaries[bookTitle] || {};
+                return !bookSummaries[chapter.title];
+            });
+
+            if (chaptersToGenerate.length === 0) {
+                addSystemMessage(`《${bookTitle}》的章节摘要已存在，无需生成。`);
+                return;
+            }
+
+            updateSummaryProgress('start', `准备为《${bookTitle}》生成摘要...`);
+            let successCount = 0;
+            let firstError = null;
+
+            for (let i = 0; i < chaptersToGenerate.length; i++) {
+                const chapter = chaptersToGenerate[i];
+                updateSummaryProgress('progress', `正在生成 (${i + 1}/${chaptersToGenerate.length}): ${chapter.title}`);
+                const { success, error } = await generateSummaryForChapter(chapter.title, chapter.paraIndex);
+                if (success) {
+                    successCount++;
+                } else if (!firstError) {
+                    firstError = error;
+                }
+            }
+
+            if (successCount > 0) {
+                await saveSummaries(bookTitle);
+            }
+
+            if (firstError) {
+                updateSummaryProgress('error', `任务完成，但有失败。成功 ${successCount}/${chaptersToGenerate.length}。错误: ${firstError}`);
+            } else {
+                updateSummaryProgress('done', `所有摘要已成功生成！(${successCount}/${chaptersToGenerate.length})`);
+            }
+        };
+
+        const renderBookList = () => {
+            dom.bookList.innerHTML = '';
+            const bookIds = Object.keys(state.books);
+            if (bookIds.length === 0) {
+                dom.bookList.innerHTML = '<p style="text-align:center;color:#888;">书架是空的</p>';
+                return;
+            }
+            bookIds.forEach(bookId => {
+                const book = state.books[bookId];
+                const item = document.createElement('div');
+                item.className = 'book-item';
+                item.innerHTML = `
+                    <span class="book-item-title">${book.title}</span>
+                    <div class="book-item-actions">
+                        <button class="reader-btn read-btn" data-book-id="${bookId}">阅读</button>
+                        <button class="reader-btn delete-btn" data-book-id="${bookId}">删除</button>
+                    </div>
+                `;
+                dom.bookList.appendChild(item);
+            });
+        };
+
+        const showBookListModal = () => {
+            renderBookList();
+            dom.bookListModal.classList.add('show');
+        };
+
+        const hideBookListModal = () => dom.bookListModal.classList.remove('show');
+
+        dom.sendBtn.addEventListener('click', handleSendMessage);
+        dom.messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSendMessage(); });
+        dom.bookFileInput.addEventListener('change', handleFileUpload);
+        dom.changeBookBtn.addEventListener('click', showBookListModal);
+        dom.addBookBtn.addEventListener('click', () => dom.bookFileInput.click());
+        dom.closeBookListBtn.addEventListener('click', hideBookListModal);
+        dom.bookListModal.addEventListener('click', (e) => {
+            if (e.target === dom.bookListModal) hideBookListModal();
+            const readBtn = e.target.closest('.read-btn');
+            if (readBtn) loadBook(readBtn.dataset.bookId);
+            const deleteBtn = e.target.closest('.delete-btn');
+            if (deleteBtn) deleteBook(deleteBtn.dataset.bookId);
+        });
+        
+        dom.settingsBtn.addEventListener('click', showSettings);
+        dom.settingsBackBtn.addEventListener('click', hideSettings);
+        dom.saveSettingsBtn.addEventListener('click', saveSettings);
+        dom.clearChatBtn.addEventListener('click', clearChatHistory);
+        dom.syncApiBtn.addEventListener('click', syncApiSettings);
+        dom.savePresetBtn.addEventListener('click', handleSavePreset);
+        dom.resetPresetsBtn.addEventListener('click', handleResetPresets);
+        dom.fetchModelsBtn.addEventListener('click', handleFetchModels);
+        dom.testConnectionBtn.addEventListener('click', handleTestConnection);
+        dom.apiModelSelect.addEventListener('change', (e) => {
+            dom.apiModel.value = e.target.value;
+        });
+        
+        const handleImageUpload = (event, callback) => {
+            const file = event.target.files[0];
+            if (!file || !file.type.startsWith('image/')) {
+                event.target.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const MAX_WIDTH = 1024;
+                    const MAX_HEIGHT = 1024;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    callback(dataUrl);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+            event.target.value = '';
+        };
+
+        dom.aiAvatarInput.addEventListener('change', (e) => handleImageUpload(e, (result) => { state.settings.aiAvatar = result; dom.aiAvatarSetting.src = result; }));
+        dom.userAvatarInput.addEventListener('change', (e) => handleImageUpload(e, (result) => { state.settings.userAvatar = result; dom.userAvatarSetting.src = result; }));
+        dom.readerBgImageInput.addEventListener('change', (e) => handleImageUpload(e, (result) => {
+            state.settings.theme.readerBgImage = result;
+            updateThemePreview();
+        }));
+        dom.chatBgInput.addEventListener('change', (e) => handleImageUpload(e, (result) => {
+            state.settings.chatBgImage = result;
+            document.documentElement.style.setProperty('--chat-bg-image', `url(${result})`);
+        }));
+
+        dom.navItems.forEach(item => item.addEventListener('click', () => switchView(item.dataset.view)));
+        dom.tocBtn.addEventListener('click', () => toggleTOC(true));
+        dom.tocOverlay.addEventListener('click', (e) => { e.stopPropagation(); toggleTOC(false); });
+        dom.tocList.addEventListener('click', (e) => {
+            const li = e.target.closest('li');
+            if (li && li.dataset.paraIndex) {
+                const anchor = document.getElementById(`para-id-${li.dataset.paraIndex}`);
+                if (anchor) {
+                    anchor.scrollIntoView({ behavior: 'smooth' });
+                }
+                toggleTOC(false);
+            }
+        });
+        
+        [dom.readerBgColor, dom.readerFontColor, dom.readerCommentColor, dom.readerUserCommentColor, dom.readerFontSize].forEach(el => el.addEventListener('input', updateThemePreview));
+        
+        dom.readerContentWrapper.addEventListener('scroll', handleReaderScroll);
+        
+        dom.readerStatusBar.addEventListener('click', () => {
+            if (state.reading.isStatusBarVisible) {
+                hideStatusBar();
+            } else {
+                showStatusBar();
+            }
+        });
+        
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.comment-popup') && !e.target.closest('.comment-icon')) {
+                hideCommentPopup();
+            }
+            if (!dom.selectionMenu.contains(e.target)) {
+                setTimeout(() => {
+                    if (!dom.userCommentModal.classList.contains('show')) {
+                         hideSelectionMenu();
+                    }
+                }, 150);
+            }
+        });
+
+        dom.readerContent.addEventListener('click', (e) => {
+            const icon = e.target.closest('.comment-icon');
+            if (icon) {
+                showCommentPopup(icon);
+            }
+            if (e.target.id === 'upload-book-btn-placeholder') {
+                showBookListModal();
+            }
+        });
+
+        document.addEventListener('selectionchange', handleSelectionChange);
+
+        dom.menuAddNote.addEventListener('click', showUserCommentModal);
+        dom.menuAskAi.addEventListener('click', () => {
+            const pElement = state.selection.range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE 
+                ? state.selection.range.commonAncestorContainer.closest('p')
+                : state.selection.range.commonAncestorContainer.parentElement.closest('p');
+            getCommentOnQuote(state.selection.text, pElement);
+            hideSelectionMenu();
+            window.getSelection().removeAllRanges();
+        });
+        dom.saveCommentBtn.addEventListener('click', saveUserComment);
+        dom.cancelCommentBtn.addEventListener('click', hideUserCommentModal);
+        dom.userCommentModal.addEventListener('click', (e) => {
+            if (e.target === dom.userCommentModal) {
+                hideUserCommentModal();
+            }
+        });
+
+        dom.summaryBtn.addEventListener('click', showSummaryModal);
+        dom.closeSummaryBtn.addEventListener('click', hideSummaryModal);
+        dom.saveSummaryBtn.addEventListener('click', async () => {
+            state.settings.reading.autoGenerateSummaries = dom.autoSummaryToggle.checked;
+            await localforage.setItem('readingCompanionSettings', state.settings);
+            await saveSummaries();
+        });
+        dom.summaryModal.addEventListener('click', (e) => {
+            if (e.target === dom.summaryModal) hideSummaryModal();
+        });
+        dom.summaryList.addEventListener('click', (e) => {
+            if (e.target.classList.contains('ai-gen-btn')) {
+                const btn = e.target;
+                generateSummaryForChapter(btn.dataset.chapterTitle, parseInt(btn.dataset.paraIndex, 10));
+            }
+        });
+        dom.summaryProgressToggle.addEventListener('click', () => {
+            dom.summaryProgressModal.classList.toggle('collapsed');
+        });
+
+        const initializeApp = async () => {
+            await loadSettings();
+            await loadChatHistory();
+            await loadSummaries();
+            
+            state.books = await localforage.getItem('books') || {};
+            state.activeBookId = await localforage.getItem('lastActiveBookId');
+            
+            if (state.activeBookId && !state.books[state.activeBookId]) {
+                state.activeBookId = null;
+                await localforage.removeItem('lastActiveBookId');
+            }
+            
+            dom.readerProgressContainer.style.display = 'none';
+            displayBookContent();
+        };
+
+        initializeApp();
+    });
+    </script>
+</body>
+</html>
