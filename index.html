@@ -98,6 +98,8 @@
         .message.user .message-content { background-color: var(--user-bubble-color); color: #000; border-top-right-radius: 5px; }
         .message.ai .message-content { background-color: var(--ai-bubble-color); border-top-left-radius: 5px; }
         .message-content .quote { border-left: 3px solid var(--accent-color); padding-left: 10px; margin: 0 0 8px; font-style: italic; color: var(--secondary-text-color); font-size: 0.9em; }
+        .message-content .rp-action { color: #9a9a9a; font-style: italic; opacity: 0.95; }
+        .message.user .message-content .rp-action { color: #5f7a73; }
         .timestamp { font-size: 12px; color: var(--secondary-text-color); margin: 4px 50px 0; max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out, margin 0.3s ease-out; opacity: 0; text-align: center; }
         .message-wrapper.show-timestamp .timestamp { max-height: 20px; margin-top: 4px; opacity: 1; }
         .typing-indicator { display: flex; align-items: center; gap: 5px; padding: 10px 15px; background-color: var(--ai-bubble-color); border-radius: 18px; border-top-left-radius: 5px; box-shadow: 0 1px 2px var(--shadow-light); }
@@ -218,21 +220,33 @@
         #selection-menu button:not(:last-child) { border-right: 1px solid rgba(255, 255, 255, 0.2); }
         #selection-menu button:active { background-color: rgba(255, 255, 255, 0.1); }
 
-        #user-comment-modal, #summary-modal, #book-list-modal, #search-modal {
+        #user-comment-modal, #summary-modal, #book-list-modal, #search-modal, #notes-modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;
             z-index: 300; opacity: 0; visibility: hidden; transition: opacity 0.2s;
         }
-        #user-comment-modal.show, #summary-modal.show, #search-modal.show { 
+        #user-comment-modal.show, #summary-modal.show, #search-modal.show, #notes-modal.show { 
             opacity: 1; visibility: visible; align-items: flex-start; padding-top: 20px;
         }
         #book-list-modal.show {
             opacity: 1; visibility: visible;
         }
-        .comment-modal-content, .summary-modal-content, .book-list-modal-content, .search-modal-content { background-color: white; padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); display: flex; flex-direction: column; max-height: 80vh; }
-        .comment-modal-content h4, .summary-modal-content h4, .book-list-modal-content h4, .search-modal-content h4 { margin-top: 0; }
+        .comment-modal-content, .summary-modal-content, .book-list-modal-content, .search-modal-content, .notes-modal-content { background-color: white; padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); display: flex; flex-direction: column; max-height: 80vh; }
+        .comment-modal-content h4, .summary-modal-content h4, .book-list-modal-content h4, .search-modal-content h4, .notes-modal-content h4 { margin-top: 0; }
         .comment-modal-content textarea { width: 100%; min-height: 80px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; font-size: 16px; margin-bottom: 15px; resize: vertical; }
-        .comment-modal-buttons, .summary-modal-buttons, .book-list-modal-buttons, .search-modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; flex-shrink: 0; }
+        .comment-modal-buttons, .summary-modal-buttons, .book-list-modal-buttons, .search-modal-buttons, .notes-modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; flex-shrink: 0; }
+
+        #notes-list { flex-grow: 1; overflow-y: auto; margin: 0 -5px; padding: 0 5px; }
+        #notes-list .notes-empty { color: var(--secondary-text-color); text-align: center; padding: 30px 0; }
+        .note-chapter { font-weight: 600; margin: 16px 0 8px; color: var(--primary-text-color); border-bottom: 1px solid #eee; padding-bottom: 4px; }
+        .note-chapter:first-child { margin-top: 0; }
+        .note-item { margin-bottom: 14px; }
+        .note-quote { border-left: 3px solid var(--accent-color); padding-left: 10px; color: var(--secondary-text-color); font-style: italic; font-size: 0.9em; margin-bottom: 6px; white-space: pre-wrap; }
+        .note-comment { font-size: 0.95em; line-height: 1.55; white-space: pre-wrap; }
+        .note-comment .note-label { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 8px; margin-right: 6px; color: #fff; vertical-align: 1px; }
+        .note-comment.ai .note-label { background-color: #a3ccc4; }
+        .note-comment.user .note-label { background-color: #f7c5a8; }
+        .notes-summary-line { font-size: 12px; color: var(--secondary-text-color); margin: 0 0 12px; flex-shrink: 0; }
         
         #book-list { flex-grow: 1; overflow-y: auto; margin: 0 -10px; padding: 0 10px; }
         .book-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 5px; border-bottom: 1px solid #eee; }
@@ -432,8 +446,10 @@
                     <button class="icon-btn" id="toc-btn" title="目录"><svg viewBox="0 0 24 24"><path d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z" /></svg></button>
                     <div class="title" id="book-title">阅读</div>
                     <div class="right-icons">
+                         <button class="icon-btn" id="reader-comment-btn" title="让伴侣点评本章"><svg viewBox="0 0 24 24"><path d="M9,22A1,1 0 0,1 8,21V18H4A2,2 0 0,1 2,16V4C2,2.89 2.9,2 4,2H20A2,2 0 0,1 22,4V16A2,2 0 0,1 20,18H13.9L10.2,21.71C10,21.9 9.75,22 9.5,22V22H9M10,16V19.08L13.08,16H20V4H4V16H10M16.25,6.88C17.11,6.88 17.81,7.58 17.81,8.44C17.81,9.31 17.11,10 16.25,10C15.38,10 14.69,9.31 14.69,8.44C14.69,7.58 15.38,6.88 16.25,6.88M11.75,6.88C12.61,6.88 13.31,7.58 13.31,8.44C13.31,9.31 12.61,10 11.75,10C10.88,10 10.19,9.31 10.19,8.44C10.19,7.58 10.88,6.88 11.75,6.88M7.25,6.88C8.11,6.88 8.81,7.58 8.81,8.44C8.81,9.31 8.11,10 7.25,10C6.38,10 5.69,9.31 5.69,8.44C5.69,7.58 6.38,6.88 7.25,6.88Z" /></svg></button>
                          <button class="icon-btn" id="search-btn" title="全文搜索"><svg viewBox="0 0 24 24"><path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z" /></svg></button>
                         <button class="icon-btn" id="summary-btn" title="章节摘要"><svg viewBox="0 0 24 24"><path d="M14 17H16V19H14V17M14 15H16V10H14V15M20 2H4C2.9 2 2 2.9 2 4V20C2 21.1 2.9 22 4 22H20C21.1 22 22 21.1 22 20V4C22 2.9 21.1 2 20 2M12 9H8V5H12V9M20 20H4V4H20V20Z"/></svg></button>
+                        <button class="icon-btn" id="notes-btn" title="书籍笔记"><svg viewBox="0 0 24 24"><path d="M17,3H7A2,2 0 0,0 5,5V21L12,18L19,21V5A2,2 0 0,0 17,3M17,18L12,15.82L7,18V5H17V18M8,7H16V9H8V7M8,11H16V13H8V11Z" /></svg></button>
                         <button class="icon-btn" id="change-book-btn" title="书架"><svg viewBox="0 0 24 24"><path d="M13,3V9H21V3M13,21H21V11H13M3,21H11V15H3M3,13H11V3H3V13Z"/></svg></button>
                     </div>
                 </header>
@@ -521,6 +537,53 @@
                         <div class="form-item avatar-setting"><img id="user-avatar-setting" src="" alt="User Avatar" class="avatar"><button onclick="document.getElementById('user-avatar-input').click()">更换头像</button></div>
                         <div class="form-item"><label>聊天气泡</label><input type="color" id="user-bubble-color-input"></div>
                         <div class="form-item"><label>聊天背景</label><button class="inline-btn" onclick="document.getElementById('chat-bg-input').click()">更换聊天背景</button></div>
+                        <div class="form-item"><label for="user-persona">用户人设（你是谁，AI 会据此了解并对待你）</label><textarea id="user-persona" rows="4" placeholder="例如：我叫小夏，25岁，安静内向，喜欢在深夜读书。希望你像相识多年的老友一样陪着我。"></textarea></div>
+                    </div>
+                    <div class="settings-group">
+                        <h3>角色扮演 &amp; 世界书</h3>
+                        <div class="form-item">
+                            <label for="rp-immersive">沉浸式扮演（允许神态 / 动作 / 心理描写）</label>
+                            <input type="checkbox" id="rp-immersive">
+                        </div>
+                        <div class="form-item">
+                            <label for="rp-proactive">更主动地交流（主动开启话题、表达情绪）</label>
+                            <input type="checkbox" id="rp-proactive">
+                        </div>
+                        <div class="form-item">
+                            <label for="rp-reply-length">回复详细度</label>
+                            <select id="rp-reply-length">
+                                <option value="short">简短（1~3 句）</option>
+                                <option value="medium">适中（含少量神态动作）</option>
+                                <option value="long">细腻（丰富的描写与画面感）</option>
+                            </select>
+                        </div>
+                        <div class="form-item">
+                            <label>世界书（Lorebook）</label>
+                            <p style="font-size:12px;color:var(--secondary-text-color);margin:4px 0 8px;">当对话或阅读内容中出现「触发词」时，对应设定会自动注入给 AI。勾选「常驻」则始终注入。</p>
+                            <div id="world-book-container"></div>
+                            <button id="add-world-entry-btn" class="inline-btn action-btn" style="margin-top:8px;">+ 添加世界书条目</button>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <h3>记忆</h3>
+                        <div class="form-item">
+                            <label for="memory-enabled">启用长期记忆</label>
+                            <input type="checkbox" id="memory-enabled">
+                        </div>
+                        <div class="form-item">
+                            <label for="memory-context-rounds">AI 读取最近多少轮对话</label>
+                            <input type="number" id="memory-context-rounds" min="1" max="100" step="1" style="width:80px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;">
+                        </div>
+                        <div class="form-item">
+                            <label for="memory-auto-rounds">每多少轮自动总结一次记忆（0 = 关闭自动）</label>
+                            <input type="number" id="memory-auto-rounds" min="0" max="200" step="1" style="width:80px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;">
+                        </div>
+                        <div class="form-item">
+                            <label>记忆库（可自行编辑或删除每条记忆）</label>
+                            <p style="font-size:12px;color:var(--secondary-text-color);margin:4px 0 8px;">这些记忆会作为长期记忆注入给 AI。编辑后会自动保存。</p>
+                            <div id="memory-list-container"></div>
+                            <button id="memory-summarize-now-btn" class="inline-btn action-btn" style="margin-top:8px;">立即总结尚未记录的对话</button>
+                        </div>
                     </div>
                     <div class="settings-group">
                         <h3>主题定制</h3>
@@ -661,6 +724,8 @@
                     <label for="auto-summary-toggle">上传新书时自动生成摘要</label>
                     <input type="checkbox" id="auto-summary-toggle">
                 </div>
+                <button id="generate-all-summaries-btn" class="reader-btn" style="width:100%;margin-top:8px;">一键生成 / 续传全书摘要</button>
+                <p style="font-size:12px;color:var(--secondary-text-color);margin:6px 0 0;">会自动跳过已生成的章节，可从上次中断处继续。</p>
             </div>
             <div class="summary-modal-buttons">
                 <button id="close-summary-btn" class="reader-btn" style="background-color: #aaa;">关闭</button>
@@ -676,6 +741,19 @@
             <div class="book-list-modal-buttons">
                  <button id="add-book-btn" class="reader-btn">添加新书</button>
                  <button id="close-book-list-btn" class="reader-btn" style="background-color: #aaa;">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notes-modal">
+        <div class="notes-modal-content">
+            <h4 id="notes-title">书籍笔记</h4>
+            <p class="notes-summary-line" id="notes-summary-line"></p>
+            <div id="notes-list"></div>
+            <div class="notes-modal-buttons">
+                <button id="export-notes-txt-btn" class="reader-btn">导出 TXT</button>
+                <button id="export-notes-docx-btn" class="reader-btn">导出 DOCX</button>
+                <button id="close-notes-btn" class="reader-btn" style="background-color: #aaa;">关闭</button>
             </div>
         </div>
     </div>
@@ -734,6 +812,15 @@
             changeBookBtn: document.getElementById('change-book-btn'),
             summaryBtn: document.getElementById('summary-btn'),
             searchBtn: document.getElementById('search-btn'),
+            readerCommentBtn: document.getElementById('reader-comment-btn'),
+            notesBtn: document.getElementById('notes-btn'),
+            notesModal: document.getElementById('notes-modal'),
+            notesTitle: document.getElementById('notes-title'),
+            notesSummaryLine: document.getElementById('notes-summary-line'),
+            notesList: document.getElementById('notes-list'),
+            closeNotesBtn: document.getElementById('close-notes-btn'),
+            exportNotesTxtBtn: document.getElementById('export-notes-txt-btn'),
+            exportNotesDocxBtn: document.getElementById('export-notes-docx-btn'),
             tocBtn: document.getElementById('toc-btn'),
             tocPanel: document.getElementById('toc-panel'),
             tocOverlay: document.getElementById('toc-overlay'),
@@ -755,6 +842,17 @@
             aiAvatarInput: document.getElementById('ai-avatar-input'), aiBubbleColorInput: document.getElementById('ai-bubble-color-input'),
             userName: document.getElementById('user-name'), userPatSuffixes: document.getElementById('user-pat-suffixes'), userAvatarInput: document.getElementById('user-avatar-input'),
             userBubbleColorInput: document.getElementById('user-bubble-color-input'),
+            userPersona: document.getElementById('user-persona'),
+            rpImmersive: document.getElementById('rp-immersive'),
+            rpProactive: document.getElementById('rp-proactive'),
+            rpReplyLength: document.getElementById('rp-reply-length'),
+            worldBookContainer: document.getElementById('world-book-container'),
+            addWorldEntryBtn: document.getElementById('add-world-entry-btn'),
+            memoryEnabled: document.getElementById('memory-enabled'),
+            memoryContextRounds: document.getElementById('memory-context-rounds'),
+            memoryAutoRounds: document.getElementById('memory-auto-rounds'),
+            memoryListContainer: document.getElementById('memory-list-container'),
+            memorySummarizeNowBtn: document.getElementById('memory-summarize-now-btn'),
             chatBgInput: document.getElementById('chat-bg-input'),
             aiAvatarSetting: document.getElementById('ai-avatar-setting'), userAvatarSetting: document.getElementById('user-avatar-setting'),
             bookFileInput: document.getElementById('book-file-input'),
@@ -783,6 +881,7 @@
             summaryModal: document.getElementById('summary-modal'),
             summaryList: document.getElementById('summary-list'),
             autoSummaryToggle: document.getElementById('auto-summary-toggle'),
+            generateAllSummariesBtn: document.getElementById('generate-all-summaries-btn'),
             saveSummaryBtn: document.getElementById('save-summary-btn'),
             closeSummaryBtn: document.getElementById('close-summary-btn'),
             clearChatBtn: document.getElementById('clear-chat-btn'),
@@ -827,6 +926,18 @@
                 aiBubbleColor: '#ffffff',
                 userName: '我', userPatSuffixes: ['的脸颊', '的肩膀加油', '的小肚子'], userAvatar: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZmlsbD0iI2Y1ZjVmNSIvPjxwYXRoIGQ9Ik01MCAyMUMzMi45IDIxIDIxIDMyLjkgMjEgNTBjMCAxMS40IDUuOSAyMS4yIDE0LjggMjYuNkM0MC4yIDc5LjUgNDUgODIgNTAgODJzOS44LTIuNSAxNC4yLTUuNEM3My4xIDcxLjIgNzkgNjEuNCA3OSA1MCA3OSAzMi45IDY3LjEgMjEgNTAgMjF6TTUwIDY4Yy05LjkgMC0xOC04LjEtMTgtMThzOC4xLTE4IDE4LTE4IDE4IDguMSAxOCAxOCA4LjEgMTggMTggMTh6IiBmaWxsPSIjY2NjY2NjIi8+PC9zdmc+',
                 userBubbleColor: '#a3ccc4',
+                userPersona: '',
+                worldBook: [],
+                rp: {
+                    immersive: true,          // 允许神态/动作/心理描写
+                    replyLength: 'medium',    // 'short' | 'medium' | 'long'
+                    proactive: true,          // 更主动地开启话题、表达情绪
+                },
+                memory: {
+                    enabled: true,            // 是否启用长期记忆
+                    contextRounds: 10,        // AI 读取最近多少轮对话
+                    autoSummarizeRounds: 20,  // 每多少轮自动总结一次记忆（0=关闭自动）
+                },
                 chatBgImage: 'none',
                 theme: {
                     readerBg: '#fdfcfa',
@@ -847,6 +958,8 @@
             books: {},
             activeBookId: null,
             summaries: {},
+            memories: [],
+            memoryMeta: { lastSummarizedTimestamp: 0 },
             chat: {
                 history: [],
                 lastMessageTimestamp: 0,
@@ -985,6 +1098,91 @@
         const showSettings = () => dom.settingsView.classList.add('active');
         const hideSettings = () => dom.settingsView.classList.remove('active');
 
+        // ===== 世界书（Lorebook）编辑器 =====
+        const createWorldEntryRow = (entry = {}) => {
+            const row = document.createElement('div');
+            row.className = 'world-entry';
+            row.style.cssText = 'border:1px solid #e0e0e0;border-radius:10px;padding:10px;margin-bottom:10px;background:#fafafa;';
+            const name = entry.name || '';
+            const keywords = Array.isArray(entry.keywords) ? entry.keywords.join('、') : (entry.keywords || '');
+            const content = entry.content || '';
+            const enabled = entry.enabled !== false;
+            const constant = entry.constant === true;
+            row.innerHTML = `
+                <input type="text" class="wb-name" placeholder="条目名称（如：主角的故乡）" value="${name.replace(/"/g, '&quot;')}" style="width:100%;margin-bottom:6px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;">
+                <input type="text" class="wb-keywords" placeholder="触发词，用「、」或逗号分隔" value="${keywords.replace(/"/g, '&quot;')}" style="width:100%;margin-bottom:6px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;">
+                <textarea class="wb-content" rows="3" placeholder="设定内容（触发时注入给 AI 的背景知识）" style="width:100%;margin-bottom:6px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;">${content.replace(/</g, '&lt;')}</textarea>
+                <div style="display:flex;align-items:center;gap:14px;font-size:13px;">
+                    <label style="display:flex;align-items:center;gap:4px;margin:0;"><input type="checkbox" class="wb-enabled" ${enabled ? 'checked' : ''}>启用</label>
+                    <label style="display:flex;align-items:center;gap:4px;margin:0;"><input type="checkbox" class="wb-constant" ${constant ? 'checked' : ''}>常驻</label>
+                    <button type="button" class="wb-delete inline-btn danger-btn" style="margin-left:auto;padding:4px 10px;font-size:12px;">删除</button>
+                </div>
+            `;
+            row.querySelector('.wb-delete').addEventListener('click', () => row.remove());
+            return row;
+        };
+
+        const renderWorldBook = () => {
+            if (!dom.worldBookContainer) return;
+            dom.worldBookContainer.innerHTML = '';
+            const list = Array.isArray(state.settings.worldBook) ? state.settings.worldBook : [];
+            list.forEach(entry => dom.worldBookContainer.appendChild(createWorldEntryRow(entry)));
+        };
+
+        const readWorldBookFromDOM = () => {
+            if (!dom.worldBookContainer) return [];
+            return Array.from(dom.worldBookContainer.querySelectorAll('.world-entry')).map(row => ({
+                name: row.querySelector('.wb-name').value.trim(),
+                keywords: row.querySelector('.wb-keywords').value.split(/[、,，]/).map(k => k.trim()).filter(Boolean),
+                content: row.querySelector('.wb-content').value.trim(),
+                enabled: row.querySelector('.wb-enabled').checked,
+                constant: row.querySelector('.wb-constant').checked,
+            })).filter(e => e.name || e.content || e.keywords.length);
+        };
+
+        // ===== 记忆库编辑器 =====
+        const renderMemoryList = () => {
+            if (!dom.memoryListContainer) return;
+            dom.memoryListContainer.innerHTML = '';
+            const list = Array.isArray(state.memories) ? state.memories : [];
+            if (!list.length) {
+                dom.memoryListContainer.innerHTML = '<p style="font-size:12px;color:var(--secondary-text-color);margin:0;">暂无记忆。达到设定轮数会自动生成，或点击下方按钮手动总结。</p>';
+                return;
+            }
+            list.forEach(entry => {
+                const row = document.createElement('div');
+                row.className = 'memory-entry';
+                row.style.cssText = 'border:1px solid #e0e0e0;border-radius:10px;padding:10px;margin-bottom:10px;background:#fafafa;';
+                const dateStr = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '';
+                const ta = document.createElement('textarea');
+                ta.className = 'mem-text';
+                ta.rows = 3;
+                ta.value = entry.text || '';
+                ta.style.cssText = 'width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;';
+                ta.addEventListener('change', async () => { entry.text = ta.value.trim(); await saveMemories(); });
+                const bar = document.createElement('div');
+                bar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:6px;font-size:12px;color:var(--secondary-text-color);';
+                const time = document.createElement('span');
+                time.textContent = dateStr;
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'inline-btn danger-btn';
+                del.textContent = '删除';
+                del.style.cssText = 'margin-left:auto;padding:4px 10px;font-size:12px;';
+                del.addEventListener('click', async () => {
+                    state.memories = state.memories.filter(m => m.id !== entry.id);
+                    await saveMemories();
+                    renderMemoryList();
+                });
+                bar.appendChild(time);
+                bar.appendChild(del);
+                row.appendChild(ta);
+                row.appendChild(bar);
+                dom.memoryListContainer.appendChild(row);
+            });
+        };
+
+
         const saveSettings = async () => {
             try {
                 state.settings.apiUrl = dom.apiUrl.value.replace(/\/$/, ''); 
@@ -1002,6 +1200,18 @@
                 state.settings.userPatSuffixes = dom.userPatSuffixes.value.split('\n').filter(s => s.trim()).map(s => s.trim());
                 state.settings.userAvatar = dom.userAvatarSetting.src;
                 state.settings.userBubbleColor = dom.userBubbleColorInput.value;
+                state.settings.userPersona = dom.userPersona.value;
+                state.settings.rp = {
+                    immersive: dom.rpImmersive.checked,
+                    proactive: dom.rpProactive.checked,
+                    replyLength: dom.rpReplyLength.value,
+                };
+                state.settings.worldBook = readWorldBookFromDOM();
+                state.settings.memory = {
+                    enabled: dom.memoryEnabled.checked,
+                    contextRounds: Math.max(1, parseInt(dom.memoryContextRounds.value, 10) || 10),
+                    autoSummarizeRounds: Math.max(0, parseInt(dom.memoryAutoRounds.value, 10) || 0),
+                };
                 state.settings.theme.readerBg = dom.readerBgColor.value;
                 state.settings.theme.readerFontColor = dom.readerFontColor.value;
                 state.settings.theme.readerCommentColor = dom.readerCommentColor.value;
@@ -1178,6 +1388,9 @@
                     const mergedSettings = { ...state.settings, ...parsed };
                     mergedSettings.theme = { ...state.settings.theme, ...(parsed.theme || {}) };
                     mergedSettings.reading = { ...state.settings.reading, ...(parsed.reading || {}) };
+                    mergedSettings.rp = { ...state.settings.rp, ...(parsed.rp || {}) };
+                    mergedSettings.memory = { ...state.settings.memory, ...(parsed.memory || {}) };
+                    if (!Array.isArray(mergedSettings.worldBook)) mergedSettings.worldBook = [];
                     state.settings = mergedSettings;
                 }
                 catch (e) {
@@ -1204,6 +1417,17 @@
             dom.chatTitle.textContent = state.settings.aiName;
             dom.userAvatarSetting.src = state.settings.userAvatar;
             dom.userBubbleColorInput.value = state.settings.userBubbleColor;
+            dom.userPersona.value = state.settings.userPersona || '';
+            const rp = state.settings.rp || {};
+            dom.rpImmersive.checked = rp.immersive !== false;
+            dom.rpProactive.checked = rp.proactive !== false;
+            dom.rpReplyLength.value = rp.replyLength || 'medium';
+            renderWorldBook();
+            const mem = state.settings.memory || {};
+            dom.memoryEnabled.checked = mem.enabled !== false;
+            dom.memoryContextRounds.value = mem.contextRounds || 10;
+            dom.memoryAutoRounds.value = (mem.autoSummarizeRounds === undefined ? 20 : mem.autoSummarizeRounds);
+            renderMemoryList();
             
             document.querySelectorAll('.avatar[data-sender="ai"]').forEach(el => el.src = state.settings.aiAvatar);
             document.querySelectorAll('.avatar[data-sender="user"]').forEach(el => el.src = state.settings.userAvatar);
@@ -1250,8 +1474,10 @@
             const mode = state.settings.reading.paginationMode;
             if (mode === 'flip') {
                 dom.readerContentWrapper.classList.add('flip-mode');
-                // Force calculate correct column width via JS because CSS percentage column-width is unreliable
-                const width = dom.readerContentWrapper.clientWidth;
+                // Force calculate correct column width via JS because CSS percentage column-width is unreliable.
+                // Use sub-pixel accurate width (getBoundingClientRect) instead of the rounded clientWidth,
+                // otherwise the integer/fractional mismatch accumulates and pages drift after many pages.
+                const width = dom.readerContentWrapper.getBoundingClientRect().width;
                 if (width > 0) {
                     dom.readerContent.style.columnWidth = `${width}px`;
                     dom.readerContent.style.width = '100%'; 
@@ -1282,6 +1508,39 @@
             dom.paddingValue.textContent = dom.readerPadding.value;
         };
 
+        // 将文本中的 （…） 和 *…* 动作/神态描写渲染为斜体灰字（只处理文本节点，避免破坏已有标签）
+        const decorateRoleplayActions = (containerEl) => {
+            if (!containerEl) return;
+            const walker = document.createTreeWalker(containerEl, NodeFilter.SHOW_TEXT, {
+                acceptNode: (node) => {
+                    if (!node.nodeValue || !/[（*]/.test(node.nodeValue)) return NodeFilter.FILTER_REJECT;
+                    if (node.parentElement && node.parentElement.closest('.quote, .rp-action')) return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+            const targets = [];
+            while (walker.nextNode()) targets.push(walker.currentNode);
+            const re = /（[^）\n]{1,80}）|\*([^*\n]{1,80})\*/g;
+            targets.forEach(node => {
+                const text = node.nodeValue;
+                re.lastIndex = 0;
+                if (!re.test(text)) return;
+                re.lastIndex = 0;
+                const frag = document.createDocumentFragment();
+                let lastIndex = 0, m;
+                while ((m = re.exec(text)) !== null) {
+                    if (m.index > lastIndex) frag.appendChild(document.createTextNode(text.slice(lastIndex, m.index)));
+                    const span = document.createElement('span');
+                    span.className = 'rp-action';
+                    span.textContent = (m[1] !== undefined) ? m[1] : m[0]; // *…* 去掉星号；（…）保留括号
+                    frag.appendChild(span);
+                    lastIndex = re.lastIndex;
+                }
+                if (lastIndex < text.length) frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+                node.parentNode.replaceChild(frag, node);
+            });
+        };
+
         const addMessage = (sender, content, { timestamp = Date.now(), addToHistory = false, fromStorage = false, internal = false } = {}) => { /* same code */
             removeTypingIndicator();
             const wrapper = document.createElement('div');
@@ -1294,6 +1553,7 @@
             if (sender === 'user' || sender === 'ai') {
                 const avatarSrc = sender === 'user' ? state.settings.userAvatar : state.settings.aiAvatar;
                 messageEl.innerHTML = `<img src="${avatarSrc}" class="avatar" data-sender="${sender}" onclick="handleAvatarClick('${sender}')"><div class="message-content">${content}</div>`;
+                decorateRoleplayActions(messageEl.querySelector('.message-content'));
             } else {
                 messageEl.textContent = content;
             }
@@ -1401,30 +1661,119 @@
             }
         };
 
-        const getRecentChatHistory = (limit = 10) => {
+        const getRecentChatHistory = (limit = 20) => {
             return state.chat.history
                 .filter(m => !m.internal && (m.sender === 'user' || m.sender === 'ai'))
                 .slice(-limit)
-                .map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.content.replace(/<[^>]*>?/gm, '') }));
+                .map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.content.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim() }));
         };
+
+        // 将 {{char}} / {{user}} 占位符替换为实际姓名（仿酒馆写法）
+        const applyPlaceholders = (str) => (str || '')
+            .replace(/\{\{char\}\}/gi, state.settings.aiName || '角色')
+            .replace(/\{\{user\}\}/gi, state.settings.userName || '用户');
+
+        // 根据扫描文本，挑选命中的世界书条目（常驻条目始终注入）
+        const getRelevantWorldInfo = (scanText) => {
+            const wb = Array.isArray(state.settings.worldBook) ? state.settings.worldBook : [];
+            if (!wb.length) return '';
+            const text = (scanText || '').toLowerCase();
+            const picked = [];
+            wb.forEach(entry => {
+                if (!entry || entry.enabled === false || !entry.content) return;
+                const keys = (entry.keywords || []).map(k => (k || '').toLowerCase()).filter(Boolean);
+                const hit = entry.constant === true || keys.some(k => text.includes(k));
+                if (hit) picked.push(`- ${entry.name ? entry.name + '：' : ''}${entry.content.trim()}`);
+            });
+            return picked.join('\n');
+        };
+
+        // 构建角色扮演式 system prompt（对话与阅读评论共用）
+        const buildRoleplaySystemContent = ({ scanText = '', sceneExtra = '', lengthOverride = '' } = {}) => {
+            const s = state.settings;
+            const rp = s.rp || {};
+            const charName = s.aiName || '伴侣';
+            const userName = s.userName || '我';
+            const lengthMap = {
+                short: '简短自然，通常 1~3 句话，不要长篇大论。',
+                medium: '长度适中，2~5 句，可穿插少量神态或动作描写。',
+                long: '细腻生动，可包含丰富的动作、神态、心理活动与环境描写，让画面感十足。'
+            };
+            const lengthGuide = lengthOverride || lengthMap[rp.replyLength] || lengthMap.medium;
+
+            const parts = [];
+            parts.push(`你正在进行沉浸式的角色扮演对话。请始终以「${charName}」的身份存在，绝不承认自己是 AI、程序、模型或助手，也不要跳出角色。你会像一个真实、有血有肉的人那样，陪伴「${userName}」一起读书、聊天、相处。`);
+
+            parts.push(`【你的角色：${charName}】\n${applyPlaceholders(s.aiPrompt) || '（未设定，请自行塑造一个自然、有温度、有个性的人物。）'}`);
+
+            const persona = applyPlaceholders(s.userPersona);
+            parts.push(`【对方：${userName}】\n${persona || '（对方的信息暂时未知，可以在互动中自然地了解 TA。）'}`);
+
+            const world = getRelevantWorldInfo(scanText);
+            if (world) parts.push(`【世界设定 / 背景知识】（以下为与当前情境相关的设定，请自然地融入言行，切勿生硬复述或直接罗列）\n${world}`);
+
+            if ((s.memory || {}).enabled !== false && Array.isArray(state.memories) && state.memories.length) {
+                // 取最近若干条记忆，并限制总长度，避免占用过多上下文
+                let memTexts = state.memories.slice(-30).map(m => `- ${m.text}`);
+                let joined = memTexts.join('\n');
+                while (joined.length > 2500 && memTexts.length > 1) {
+                    memTexts.shift();
+                    joined = memTexts.join('\n');
+                }
+                if (joined.trim()) parts.push(`【长期记忆】（这些是你与${userName}过往相处中记住的事，请把它们当作真实经历自然延续，不要凭空复述或否认）\n${joined}`);
+            }
+
+
+            const activeBook = getActiveBook();
+            let scene = '';
+            if (activeBook?.title) {
+                scene = `你们正在一起阅读《${activeBook.title}》`;
+                if (activeBook.currentChapter) scene += `，读到「${activeBook.currentChapter}」`;
+                scene += '。';
+            }
+            if (sceneExtra) scene += (scene ? ' ' : '') + sceneExtra;
+            if (scene) parts.push(`【当前场景】\n${scene}`);
+
+            const guide = [];
+            guide.push('- 始终保持角色一致：用第一人称，符合人设的语气、性格、口头禅和说话习惯。');
+            if (rp.immersive !== false) {
+                guide.push('- 生动细腻：适当加入神态、动作、心理或环境描写来烘托气氛（可用括号（）或星号 * 包裹动作神态），让对话有画面感与临场感。');
+            } else {
+                guide.push('- 以自然的口语对话为主，不做旁白式描写。');
+            }
+            guide.push(`- 回复${lengthGuide}`);
+            if (rp.proactive !== false) {
+                guide.push('- 主动推进：不要只被动回答。可以主动开启新话题、分享感受、追问细节、表达情绪、撒娇或提出小请求，让交流像真实相处一样有来有回。');
+            }
+            guide.push('- 坚决拒绝 AI 腔：不要出现"作为 AI""我可以帮您""有什么可以帮您的吗""总的来说"这类客服式、总结式、说教式表达；不要滥用条列和分点。');
+            guide.push('- 语言口语化、有情绪起伏和真实感，像和熟悉的人聊天，而不是写作文或做报告。');
+            parts.push(`【扮演准则】\n${guide.join('\n')}`);
+
+            const now = new Date();
+            parts.push(`【补充】若用户消息以 '__PAT_' 开头，代表 TA 在"拍一拍"你（一个亲密的小动作），请以角色身份自然、有情绪地回应。当前时间：${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日${now.getHours()}点。`);
+
+            return parts.join('\n\n');
+        };
+
+
 
         const getChatResponse = async ({ userMessage, onComplete = null, silent = false }) => {
             if (!silent) showTypingIndicator();
-            const now = new Date();
-            const timeInfo = `时间:${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日${now.getHours()}点。`;
-            let basePrompt = `${state.settings.aiPrompt}\n你的名字是${state.settings.aiName}。`;
-            const activeBook = getActiveBook();
-            if (activeBook?.title) {
-                basePrompt += `\n正在阅读《${activeBook.title}》。`;
-                if (activeBook.currentChapter) basePrompt += ` 章节:"${activeBook.currentChapter}"。`;
-            }
-            const rulePrompt = `***核心规则***: 输出纯粹语言内容。禁止动作描写。禁止回复中包含括号。50字以内。`;
-            const patRule = `指令: 用户发来'__PAT_...'代表"拍一拍"，请自然回应。`;
-            const systemPrompt = { role: 'system', content: `${basePrompt}\n${rulePrompt}\n${patRule}\n${timeInfo}` };
-            
-            const apiHistory = getRecentChatHistory(10);
+
+            const contextRounds = parseInt((state.settings.memory || {}).contextRounds, 10) || 10;
+            const apiHistory = getRecentChatHistory(contextRounds * 2);
+            // 世界书扫描范围：最近对话 + 本次消息
+            const scanText = [userMessage || '', ...apiHistory.map(m => m.content)].join(' ');
+            const systemPrompt = { role: 'system', content: buildRoleplaySystemContent({ scanText }) };
+
             const messages = [systemPrompt, ...apiHistory];
-            if(userMessage) messages.push({ role: 'user', content: userMessage });
+            if (userMessage) {
+                // 避免与历史中最后一条用户消息重复入列
+                const last = apiHistory[apiHistory.length - 1];
+                if (!last || last.role !== 'user' || last.content !== userMessage) {
+                    messages.push({ role: 'user', content: userMessage });
+                }
+            }
 
             const { content: aiResponse, error } = await callAIApi(messages, 'chat');
             if (!silent) removeTypingIndicator();
@@ -1433,10 +1782,89 @@
                 const finalResponse = aiResponse.replace(/__PAT_[\w-]+__/g, '').trim();
                 if (!silent) { addMessage('ai', finalResponse, { addToHistory: true }); }
                 if (onComplete) onComplete(finalResponse);
+                if (!silent) { maybeAutoSummarize(); }
             }
         };
 
         const saveChatHistory = async () => { await localforage.setItem('readingCompanionChat', state.chat.history); };
+
+        // ===== 长期记忆存储 =====
+        const saveMemories = async () => {
+            await localforage.setItem('readingCompanionMemories', {
+                entries: state.memories,
+                lastSummarizedTimestamp: state.memoryMeta.lastSummarizedTimestamp || 0,
+            });
+        };
+        const loadMemories = async () => {
+            const saved = await localforage.getItem('readingCompanionMemories');
+            if (saved && typeof saved === 'object') {
+                state.memories = Array.isArray(saved.entries) ? saved.entries : [];
+                state.memoryMeta.lastSummarizedTimestamp = saved.lastSummarizedTimestamp || 0;
+            }
+        };
+
+        // 取所有非内部的用户/AI消息（用于轮数统计与记忆总结）
+        const getNonInternalMessages = () => state.chat.history.filter(m => !m.internal && (m.sender === 'user' || m.sender === 'ai'));
+
+        // 把一段对话消息总结为一条记忆
+        const summarizeMemory = async (msgs, auto = false) => {
+            if (!msgs || msgs.length === 0) { if (!auto) addSystemMessage('暂无新的对话可以总结'); return; }
+            if (state.memoryMeta.summarizing) { if (!auto) addSystemMessage('正在总结中，请稍候…'); return; }
+            state.memoryMeta.summarizing = true;
+            try {
+                const userName = state.settings.userName || '用户';
+                const charName = state.settings.aiName || '角色';
+                const convo = msgs.map(m => {
+                    const who = m.sender === 'user' ? userName : charName;
+                    const clean = m.content.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+                    return `${who}：${clean}`;
+                }).join('\n');
+                const prompt = `请把下面这段「${userName}」与「${charName}」的对话，浓缩成一段简洁连贯的第三人称"记忆摘要"，记录其中发生的关键事件、双方的情绪与关系变化、达成的约定、以及透露出的重要设定或信息，方便日后回忆。只输出摘要正文本身，不要任何前缀或解释。\n\n对话记录：\n${convo}`;
+                const { content, error } = await callAIApi([
+                    { role: 'system', content: '你是一个善于提炼要点、记录人物关系与事件发展的记忆整理助手。' },
+                    { role: 'user', content: prompt }
+                ], 'summary');
+                if (error) { if (!auto) addSystemMessage('记忆总结失败：' + error); return; }
+                if (!content || !content.trim()) return;
+                const entry = {
+                    id: `mem-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                    text: content.trim(),
+                    createdAt: Date.now(),
+                    from: msgs[0].timestamp,
+                    to: msgs[msgs.length - 1].timestamp,
+                };
+                state.memories.push(entry);
+                state.memoryMeta.lastSummarizedTimestamp = msgs[msgs.length - 1].timestamp;
+                await saveMemories();
+                renderMemoryList();
+                addSystemMessage(auto ? '已自动总结并保存一段记忆（可在设置中查看/编辑）' : '已总结并保存一段记忆', true);
+            } finally {
+                state.memoryMeta.summarizing = false;
+            }
+        };
+
+        // 检查是否达到自动总结的轮数阈值
+        const maybeAutoSummarize = async () => {
+            const mem = state.settings.memory || {};
+            if (mem.enabled === false) return;
+            const every = parseInt(mem.autoSummarizeRounds, 10) || 0;
+            if (every <= 0) return;
+            const lastTs = state.memoryMeta.lastSummarizedTimestamp || 0;
+            const newMsgs = getNonInternalMessages().filter(m => m.timestamp > lastTs);
+            const newRounds = newMsgs.filter(m => m.sender === 'user').length;
+            if (newRounds >= every) {
+                await summarizeMemory(newMsgs, true);
+            }
+        };
+
+        // 手动总结「上次总结之后」尚未记录的对话
+        const summarizeUnrecorded = async () => {
+            const lastTs = state.memoryMeta.lastSummarizedTimestamp || 0;
+            const newMsgs = getNonInternalMessages().filter(m => m.timestamp > lastTs);
+            await summarizeMemory(newMsgs, false);
+        };
+
+
         const loadChatHistory = async () => {
             const savedChat = await localforage.getItem('readingCompanionChat');
             if (savedChat) {
@@ -1675,7 +2103,8 @@
             const contextSnippet = (activeBook.paragraphs.slice(Math.max(0, paraId - 2), paraId + 3).join(' ')).substring(0, 500);
 
             // Context Enhanced: Include recent history
-            const recentHistory = getRecentChatHistory(10); // Get last 10 messages
+            const contextRounds = parseInt((state.settings.memory || {}).contextRounds, 10) || 10;
+            const recentHistory = getRecentChatHistory(contextRounds * 2);
 
             const contextMessage = `
 [阅读上下文]
@@ -1683,15 +2112,23 @@
 章节: ${currentChapter.title}
 章节摘要: ${chapterSummary}
 当前段落上下文: "...${contextSnippet}..."
-用户关注的句子: "${quote}"
-请基于以上内容和我们的聊天历史，对这句话发表你的看法。
+${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
+请以你的角色身份，自然地对这句话说说你此刻的感受或联想，像和身边人分享一样。
             `.trim();
-            
-            // We manually construct the messages to include history + context
-            const systemPrompt = { role: 'system', content: `${state.settings.aiPrompt}\n你的名字是${state.settings.aiName}。回复请简洁（50字内）。` };
+
+            // 使用角色扮演 system prompt，并把阅读相关文本纳入世界书扫描范围
+            const scanText = `${quote} ${contextSnippet} ${recentHistory.map(m => m.content).join(' ')}`;
+            const systemPrompt = {
+                role: 'system',
+                content: buildRoleplaySystemContent({
+                    scanText,
+                    sceneExtra: `${state.settings.userName || '我'}正读到一句话，想和你分享。`,
+                    lengthOverride: '简短自然为宜（大约 1~3 句），像随口的分享或轻声的感慨。'
+                })
+            };
             const messages = [systemPrompt, ...recentHistory, { role: 'user', content: contextMessage }];
 
-            callAIApi(messages, 'chat').then(async ({ content: aiResponse, error }) => {
+            return callAIApi(messages, 'chat').then(async ({ content: aiResponse, error }) => {
                  if (error) {
                     addSystemMessage(`AI评论失败: ${error}`);
                     if(thinkingIcon) { removeHighlight(thinkingIcon.dataset.highlightId); thinkingIcon.remove(); }
@@ -1705,6 +2142,269 @@
                     await fillCommentPlaceholder(pElement, thinkingIcon, commentData);
                 }
             });
+        };
+
+        // 为指定段落生成一条 AI 评论（复用取句 + 高亮 + 请求逻辑），返回 Promise 便于顺序执行
+        const commentOnParagraph = (targetPara) => {
+            if (!targetPara) return Promise.resolve();
+            const text = targetPara.textContent.trim();
+            const sentences = text.match(/[^.!?。！？]+[.!?。！？]?/g) || [text];
+            if (!sentences.length) { state.selection.range = null; return getCommentOnQuote(text, targetPara); }
+            const numSentencesToPick = Math.floor(Math.random() * 3) + 1;
+            const startSentenceIndex = Math.floor(Math.random() * (sentences.length - numSentencesToPick + 1));
+            const quote = sentences.slice(startSentenceIndex, startSentenceIndex + numSentencesToPick).join('').trim();
+            if (!quote) { state.selection.range = null; return getCommentOnQuote(text, targetPara); }
+            const range = document.createRange();
+            const textNode = Array.from(targetPara.childNodes).find(node => node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SPAN'));
+            const innerTextNode = (textNode && textNode.firstChild) ? textNode.firstChild : textNode;
+            if (innerTextNode && innerTextNode.nodeType === Node.TEXT_NODE) {
+                const startIndex = innerTextNode.textContent.indexOf(quote);
+                if (startIndex !== -1) {
+                    range.setStart(innerTextNode, startIndex);
+                    range.setEnd(innerTextNode, startIndex + quote.length);
+                    state.selection.range = range;
+                    return getCommentOnQuote(quote, targetPara);
+                }
+            }
+            state.selection.range = null;
+            return getCommentOnQuote(text, targetPara);
+        };
+
+        // 从数组中均匀取 n 个元素（用于在章节里分散选段）
+        const pickEvenlySpaced = (arr, n) => {
+            if (n >= arr.length) return arr.slice();
+            if (n <= 1) return [arr[Math.floor(arr.length / 2)]];
+            const step = (arr.length - 1) / (n - 1);
+            const res = [];
+            for (let i = 0; i < n; i++) res.push(arr[Math.round(i * step)]);
+            return [...new Set(res)];
+        };
+
+        // 手动：让伴侣评论「当前章节」——在本章分散挑选多段，逐段点评（可重复点击，断网失败后可重试）
+        const manualCommentOnCurrentChapter = async () => {
+            const activeBook = getActiveBook();
+            if (!activeBook) { addSystemMessage('请先打开一本书，我才能一起读呀'); return; }
+            if (state.reading.commentingChapter) { addSystemMessage('伴侣正在写本章的感想，稍等一下～', true); return; }
+
+            const allP = Array.from(dom.readerContent.querySelectorAll('p')).filter(p => p.textContent.trim().length > 15);
+            if (!allP.length) { addSystemMessage('当前没有可以评论的内容'); return; }
+
+            // 确定当前章节范围
+            const toc = activeBook.toc || [];
+            let chapIdx = toc.findIndex(t => t.title === activeBook.currentChapter);
+            if (chapIdx < 0) chapIdx = 0;
+            const start = toc[chapIdx] ? toc[chapIdx].paraIndex : 0;
+            const end = toc[chapIdx + 1] ? toc[chapIdx + 1].paraIndex : Infinity;
+
+            const hasAiComment = (p) => {
+                const id = p.dataset.paraId;
+                return activeBook.comments[id] && activeBook.comments[id].some(c => c.type === 'ai');
+            };
+            const inChapter = (p) => {
+                const id = parseInt(p.dataset.paraId, 10);
+                return id >= start && id < end;
+            };
+
+            const chapterParas = allP.filter(inChapter);
+            const pool = chapterParas.length ? chapterParas : allP;
+            // 优先在「本章未评论」的段落里分散挑选；若都评论过则从本章全部段落里挑
+            const uncommented = pool.filter(p => !hasAiComment(p));
+            const base = uncommented.length ? uncommented : pool;
+
+            // 挑选段数：随章节长度增加，最少 2 段、最多 10 段
+            const maxN = Math.min(10, Math.max(2, Math.ceil(base.length / 4)));
+            const targets = pickEvenlySpaced(base, Math.min(maxN, base.length));
+            if (!targets.length) { addSystemMessage('本章暂时没有合适的段落可以点评'); return; }
+
+            state.reading.commentingChapter = true;
+            if (dom.readerCommentBtn) { dom.readerCommentBtn.disabled = true; dom.readerCommentBtn.style.opacity = '0.5'; }
+            addSystemMessage(`伴侣正在细读本章，准备写下 ${targets.length} 处感想…`, true);
+            try {
+                for (const target of targets) {
+                    state.reading.lastCommentTime = Date.now();
+                    await commentOnParagraph(target); // 逐段顺序生成，避免并发与限流
+                }
+            } finally {
+                state.reading.commentingChapter = false;
+                if (dom.readerCommentBtn) { dom.readerCommentBtn.disabled = false; dom.readerCommentBtn.style.opacity = ''; }
+            }
+        };
+
+        // ===== 书籍笔记：汇总所有标注（原文 + 伴侣/我的想法）=====
+        const buildNotesData = () => {
+            const book = getActiveBook();
+            if (!book) return null;
+            const toc = book.toc || [];
+            const chapterOf = (pid) => {
+                let t = '书籍开头';
+                for (let i = toc.length - 1; i >= 0; i--) { if (pid >= toc[i].paraIndex) { t = toc[i].title; break; } }
+                return t;
+            };
+            const entries = [];
+            Object.keys(book.comments || {}).forEach(pid => {
+                const arr = book.comments[pid];
+                if (!Array.isArray(arr)) return;
+                arr.forEach(c => {
+                    if (!c || (!c.text && !c.quote)) return;
+                    const paraId = parseInt(pid, 10) || 0;
+                    entries.push({ paraId, quote: c.quote || '', type: c.type === 'user' ? 'user' : 'ai', text: c.text || '' });
+                });
+            });
+            entries.sort((a, b) => a.paraId - b.paraId);
+            entries.forEach(e => e.chapter = chapterOf(e.paraId));
+            return { title: book.title || '未命名书籍', entries };
+        };
+
+        const showNotesModal = () => {
+            const book = getActiveBook();
+            if (!book) { addSystemMessage('请先打开一本书'); return; }
+            const data = buildNotesData();
+            dom.notesTitle.textContent = `《${data.title}》· 阅读笔记`;
+            dom.notesSummaryLine.textContent = `共 ${data.entries.length} 条标注`;
+            dom.notesList.innerHTML = '';
+            if (!data.entries.length) {
+                dom.notesList.innerHTML = '<div class="notes-empty">还没有任何标注。<br>在阅读时长按选中文字添加想法，或让伴侣点评本章吧～</div>';
+            } else {
+                const userName = state.settings.userName || '我';
+                const charName = state.settings.aiName || '伴侣';
+                let lastChapter = null;
+                data.entries.forEach(e => {
+                    if (e.chapter !== lastChapter) {
+                        const ch = document.createElement('div');
+                        ch.className = 'note-chapter';
+                        ch.textContent = e.chapter;
+                        dom.notesList.appendChild(ch);
+                        lastChapter = e.chapter;
+                    }
+                    const item = document.createElement('div');
+                    item.className = 'note-item';
+                    if (e.quote) {
+                        const q = document.createElement('div');
+                        q.className = 'note-quote';
+                        q.textContent = e.quote;
+                        item.appendChild(q);
+                    }
+                    const cm = document.createElement('div');
+                    cm.className = `note-comment ${e.type}`;
+                    const label = document.createElement('span');
+                    label.className = 'note-label';
+                    label.textContent = e.type === 'user' ? userName : charName;
+                    cm.appendChild(label);
+                    cm.appendChild(document.createTextNode(e.text));
+                    item.appendChild(cm);
+                    dom.notesList.appendChild(item);
+                });
+            }
+            dom.notesModal.classList.add('show');
+        };
+        const hideNotesModal = () => dom.notesModal.classList.remove('show');
+
+        const notesToText = (data) => {
+            const userName = state.settings.userName || '我';
+            const charName = state.settings.aiName || '伴侣';
+            let out = `《${data.title}》· 阅读笔记\r\n生成时间：${new Date().toLocaleString()}\r\n共 ${data.entries.length} 条标注\r\n`;
+            let lastChapter = null;
+            data.entries.forEach(e => {
+                if (e.chapter !== lastChapter) { out += `\r\n【${e.chapter}】\r\n`; lastChapter = e.chapter; }
+                if (e.quote) out += `原文：${e.quote}\r\n`;
+                const who = e.type === 'user' ? userName : charName;
+                out += `${who}：${e.text}\r\n\r\n`;
+            });
+            return out;
+        };
+
+        // 下载 Blob
+        const downloadBlob = (blob, filename) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
+        };
+
+        // 极简 ZIP 打包（store 存储，无压缩），用于生成真正的 .docx，无需任何外部依赖
+        const crc32 = (function () {
+            const table = new Uint32Array(256);
+            for (let i = 0; i < 256; i++) { let c = i; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); table[i] = c >>> 0; }
+            return (bytes) => { let crc = 0xFFFFFFFF; for (let i = 0; i < bytes.length; i++) crc = (crc >>> 8) ^ table[(crc ^ bytes[i]) & 0xFF]; return (crc ^ 0xFFFFFFFF) >>> 0; };
+        })();
+        const buildZip = (files) => {
+            const enc = new TextEncoder();
+            const u16 = (n) => [n & 0xff, (n >> 8) & 0xff];
+            const u32 = (n) => [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
+            const parts = [];
+            const central = [];
+            let offset = 0;
+            files.forEach(f => {
+                const nameBytes = enc.encode(f.name);
+                const data = (f.data instanceof Uint8Array) ? f.data : enc.encode(f.data);
+                const crc = crc32(data);
+                const size = data.length;
+                const local = new Uint8Array([].concat(
+                    u32(0x04034b50), u16(20), u16(0), u16(0), u16(0), u16(0),
+                    u32(crc), u32(size), u32(size), u16(nameBytes.length), u16(0)
+                ));
+                parts.push(local, nameBytes, data);
+                const cd = new Uint8Array([].concat(
+                    u32(0x02014b50), u16(20), u16(20), u16(0), u16(0), u16(0), u16(0),
+                    u32(crc), u32(size), u32(size), u16(nameBytes.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset)
+                ));
+                central.push(cd, nameBytes);
+                offset += local.length + nameBytes.length + data.length;
+            });
+            let cdSize = 0; central.forEach(c => cdSize += c.length);
+            const end = new Uint8Array([].concat(
+                u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length), u32(cdSize), u32(offset), u16(0)
+            ));
+            return new Blob([...parts, ...central, end], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        };
+
+        const buildDocx = (data) => {
+            const userName = state.settings.userName || '我';
+            const charName = state.settings.aiName || '伴侣';
+            const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const wp = (text, opts = {}) => {
+                const rPr = [];
+                if (opts.bold) rPr.push('<w:b/>');
+                if (opts.italic) rPr.push('<w:i/>');
+                if (opts.size) rPr.push(`<w:sz w:val="${opts.size}"/>`);
+                if (opts.color) rPr.push(`<w:color w:val="${opts.color}"/>`);
+                const rPrXml = rPr.length ? `<w:rPr>${rPr.join('')}</w:rPr>` : '';
+                const lines = esc(text).split('\n');
+                let runInner = '';
+                lines.forEach((ln, idx) => { if (idx > 0) runInner += '<w:br/>'; runInner += `<w:t xml:space="preserve">${ln}</w:t>`; });
+                return `<w:p><w:r>${rPrXml}${runInner}</w:r></w:p>`;
+            };
+            let body = '';
+            body += wp(`《${data.title}》· 阅读笔记`, { bold: true, size: 36 });
+            body += wp(`生成时间：${new Date().toLocaleString()}　共 ${data.entries.length} 条标注`, { italic: true, size: 18, color: '888888' });
+            let lastChapter = null;
+            data.entries.forEach(e => {
+                if (e.chapter !== lastChapter) { body += wp(e.chapter, { bold: true, size: 28 }); lastChapter = e.chapter; }
+                if (e.quote) body += wp(`原文：${e.quote}`, { italic: true, color: '666666' });
+                const who = e.type === 'user' ? userName : charName;
+                body += wp(`${who}：${e.text}`);
+            });
+            const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`;
+            const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
+            const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+            return buildZip([
+                { name: '[Content_Types].xml', data: contentTypes },
+                { name: '_rels/.rels', data: rels },
+                { name: 'word/document.xml', data: documentXml },
+            ]);
+        };
+
+        const exportNotes = (format) => {
+            const data = buildNotesData();
+            if (!data || !data.entries.length) { addSystemMessage('当前没有可以导出的笔记'); return; }
+            const safeTitle = (data.title || '阅读笔记').replace(/[\\/:*?"<>|]/g, '_');
+            const base = `${safeTitle}_笔记`;
+            if (format === 'txt') {
+                downloadBlob(new Blob(['\ufeff' + notesToText(data)], { type: 'text/plain;charset=utf-8' }), base + '.txt');
+            } else {
+                downloadBlob(buildDocx(data), base + '.docx');
+            }
         };
 
         const triggerAIReadComment = () => { /* same code */
@@ -2096,6 +2796,7 @@
                 books: state.books,
                 chat: state.chat,
                 summaries: state.summaries,
+                memories: { entries: state.memories, lastSummarizedTimestamp: state.memoryMeta.lastSummarizedTimestamp || 0 },
                 version: "3.0"
             };
             const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
@@ -2118,6 +2819,7 @@
                     if(data.books) await localforage.setItem('books', data.books);
                     if(data.chat) await localforage.setItem('readingCompanionChat', data.chat.history || data.chat); // compatibility
                     if(data.summaries) await localforage.setItem('readingCompanionSummaries', data.summaries);
+                    if(data.memories) await localforage.setItem('readingCompanionMemories', data.memories);
                     
                     alert('数据导入成功，即将刷新页面...');
                     location.reload();
@@ -2169,7 +2871,7 @@
                 return; // Stop flip, let the selection menu appear
             }
             
-            const width = dom.readerContentWrapper.clientWidth;
+            const width = dom.readerContentWrapper.getBoundingClientRect().width;
             const x = e.clientX;
             const rect = dom.readerContentWrapper.getBoundingClientRect();
             const relativeX = x - rect.left;
@@ -2210,6 +2912,14 @@
         dom.settingsBtn.addEventListener('click', showSettings);
         dom.settingsBackBtn.addEventListener('click', hideSettings);
         dom.saveSettingsBtn.addEventListener('click', saveSettings);
+        if (dom.addWorldEntryBtn) dom.addWorldEntryBtn.addEventListener('click', () => dom.worldBookContainer.appendChild(createWorldEntryRow()));
+        if (dom.memorySummarizeNowBtn) dom.memorySummarizeNowBtn.addEventListener('click', async () => {
+            dom.memorySummarizeNowBtn.disabled = true;
+            const original = dom.memorySummarizeNowBtn.textContent;
+            dom.memorySummarizeNowBtn.textContent = '总结中…';
+            try { await summarizeUnrecorded(); }
+            finally { dom.memorySummarizeNowBtn.disabled = false; dom.memorySummarizeNowBtn.textContent = original; }
+        });
         dom.clearChatBtn.addEventListener('click', clearChatHistory);
         dom.syncApiBtn.addEventListener('click', syncApiSettings);
         dom.savePresetBtn.addEventListener('click', handleSavePreset);
@@ -2244,6 +2954,12 @@
 
         dom.navItems.forEach(item => item.addEventListener('click', () => switchView(item.dataset.view)));
         dom.tocBtn.addEventListener('click', () => toggleTOC(true));
+        if (dom.readerCommentBtn) dom.readerCommentBtn.addEventListener('click', manualCommentOnCurrentChapter);
+        if (dom.notesBtn) dom.notesBtn.addEventListener('click', showNotesModal);
+        if (dom.closeNotesBtn) dom.closeNotesBtn.addEventListener('click', hideNotesModal);
+        if (dom.notesModal) dom.notesModal.addEventListener('click', (e) => { if (e.target === dom.notesModal) hideNotesModal(); });
+        if (dom.exportNotesTxtBtn) dom.exportNotesTxtBtn.addEventListener('click', () => exportNotes('txt'));
+        if (dom.exportNotesDocxBtn) dom.exportNotesDocxBtn.addEventListener('click', () => exportNotes('docx'));
         dom.tocOverlay.addEventListener('click', (e) => { e.stopPropagation(); toggleTOC(false); });
         dom.tocList.addEventListener('click', (e) => {
             const li = e.target.closest('li');
@@ -2293,11 +3009,26 @@
         dom.summaryModal.addEventListener('click', (e) => { if (e.target === dom.summaryModal) hideSummaryModal(); });
         dom.summaryList.addEventListener('click', (e) => { if (e.target.classList.contains('ai-gen-btn')) { const btn = e.target; generateSummaryForChapter(btn.dataset.chapterTitle, parseInt(btn.dataset.paraIndex, 10)); } });
         dom.summaryProgressToggle.addEventListener('click', () => { dom.summaryProgressModal.classList.toggle('collapsed'); });
+        if (dom.generateAllSummariesBtn) dom.generateAllSummariesBtn.addEventListener('click', async () => {
+            const activeBook = getActiveBook();
+            if (!activeBook) { addSystemMessage('请先加载一本书籍'); return; }
+            const btn = dom.generateAllSummariesBtn;
+            const orig = btn.textContent;
+            btn.disabled = true; btn.textContent = '生成中...';
+            try {
+                await saveSummaries(activeBook.title); // 先保存已手动填写的摘要，避免被覆盖
+                await generateAllSummaries(activeBook.title);
+                showSummaryModal(); // 刷新列表以显示新生成的摘要
+            } finally {
+                btn.disabled = false; btn.textContent = orig;
+            }
+        });
 
         const initializeApp = async () => {
             await loadSettings();
             await loadChatHistory();
             await loadSummaries();
+            await loadMemories();
             state.books = await localforage.getItem('books') || {};
             state.activeBookId = await localforage.getItem('lastActiveBookId');
             if (state.activeBookId && !state.books[state.activeBookId]) { state.activeBookId = null; await localforage.removeItem('lastActiveBookId'); }
@@ -2307,6 +3038,111 @@
 
         initializeApp();
     });
+
+    /* ===== PWA：Service Worker 注册 + 安装到桌面 引导（独立模块，不影响以上逻辑） ===== */
+    (function() {
+        // 判断是否已经以「已安装 App」的独立模式运行
+        const isStandalone = () =>
+            window.matchMedia('(display-mode: standalone)').matches ||
+            window.navigator.standalone === true;
+
+        // 1) 注册 Service Worker（仅在 http(s)/localhost 下有效，file:// 会静默跳过）
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch((err) => {
+                    console.warn('[PWA] Service Worker 注册失败：', err);
+                });
+            });
+        }
+
+        // 2) 悬浮「安装到桌面」按钮（Android/桌面 Chrome 等支持 beforeinstallprompt 的环境）
+        let deferredPrompt = null;
+
+        const installBtn = document.createElement('button');
+        installBtn.type = 'button';
+        installBtn.textContent = '安装到桌面';
+        installBtn.setAttribute('aria-label', '安装到桌面');
+        installBtn.style.cssText = [
+            'position:fixed',
+            'left:50%',
+            'bottom:76px',
+            'transform:translateX(-50%)',
+            'z-index:9999',
+            'display:none',
+            'padding:10px 18px',
+            'border:none',
+            'border-radius:22px',
+            'background-color:#a3ccc4',
+            'color:#fff',
+            'font-size:14px',
+            'font-family:inherit',
+            'box-shadow:0 4px 12px rgba(0,0,0,0.2)',
+            'cursor:pointer',
+            'max-width:calc(100% - 40px)'
+        ].join(';');
+        document.body.appendChild(installBtn);
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            if (!isStandalone()) installBtn.style.display = 'block';
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            try { await deferredPrompt.userChoice; } catch (e) {}
+            deferredPrompt = null;
+            installBtn.style.display = 'none';
+        });
+
+        window.addEventListener('appinstalled', () => {
+            deferredPrompt = null;
+            installBtn.style.display = 'none';
+        });
+
+        // 3) iOS Safari 不支持自动安装提示，给出「添加到主屏幕」的一次性引导
+        (function iosHint() {
+            if (isStandalone()) return;
+            const ua = window.navigator.userAgent || '';
+            const isIOS = /iphone|ipad|ipod/i.test(ua);
+            const isSafari = /safari/i.test(ua) && !/crios|fxios|edgios|chrome/i.test(ua);
+            if (!isIOS || !isSafari) return;
+            try {
+                if (localStorage.getItem('iosInstallHintDismissed') === '1') return;
+            } catch (e) {}
+
+            const hint = document.createElement('div');
+            hint.style.cssText = [
+                'position:fixed',
+                'left:50%',
+                'bottom:20px',
+                'transform:translateX(-50%)',
+                'z-index:9999',
+                'width:calc(100% - 30px)',
+                'max-width:460px',
+                'padding:12px 40px 12px 16px',
+                'border-radius:12px',
+                'background-color:rgba(50,50,50,0.94)',
+                'color:#fff',
+                'font-size:13px',
+                'line-height:1.6',
+                'font-family:inherit',
+                'box-shadow:0 4px 16px rgba(0,0,0,0.3)'
+            ].join(';');
+            hint.innerHTML = '想把「陪伴阅读」放到桌面？点击底部的「分享」按钮，再选择「添加到主屏幕」即可全屏使用。';
+
+            const closeBtn = document.createElement('span');
+            closeBtn.textContent = '×';
+            closeBtn.style.cssText = 'position:absolute;top:6px;right:12px;font-size:22px;line-height:1;cursor:pointer;color:#fff;';
+            closeBtn.addEventListener('click', () => {
+                hint.remove();
+                try { localStorage.setItem('iosInstallHintDismissed', '1'); } catch (e) {}
+            });
+            hint.appendChild(closeBtn);
+            document.body.appendChild(hint);
+        })();
+    })();
     </script>
 </body>
 </html>
