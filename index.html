@@ -458,7 +458,98 @@
             flex-shrink: 0;
             font-weight: 600;
         }
-        
+
+        /* 章节导航控制面板（点击屏幕中央弹出） */
+        .reader-nav-menu {
+            position: fixed;
+            bottom: calc(60px + var(--safe-area-bottom));
+            left: 0;
+            right: 0;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            background-color: #fff;
+            box-shadow: 0 -3px 18px rgba(0,0,0,0.14);
+            padding: 14px 18px 16px;
+            z-index: 95;
+            transform: translateY(130%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .reader-nav-menu.show { transform: translateY(0); }
+        .rnav-chapter-label {
+            text-align: center;
+            font-size: 13px;
+            color: var(--secondary-text-color);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .rnav-slider-row { display: flex; align-items: center; gap: 12px; }
+        .rnav-chapter-btn {
+            flex-shrink: 0;
+            background: none;
+            border: none;
+            color: var(--primary-text-color);
+            font-size: 14px;
+            padding: 6px 2px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .rnav-chapter-btn:disabled { color: #ccc; cursor: default; }
+        .rnav-slider-wrap { flex: 1; position: relative; display: flex; align-items: center; height: 22px; }
+        .rnav-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: #e2e2e2;
+            outline: none;
+            margin: 0;
+        }
+        .rnav-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+            cursor: pointer;
+        }
+        .rnav-slider::-moz-range-thumb {
+            width: 18px; height: 18px; border: none;
+            border-radius: 50%;
+            background: var(--accent-color);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+            cursor: pointer;
+        }
+        .rnav-slider-tip {
+            position: absolute;
+            bottom: 28px;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.78);
+            color: #fff;
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            white-space: nowrap;
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+        }
+        .rnav-slider-tip.show { opacity: 1; }
+        .rnav-toc-entry { text-align: center; }
+        .rnav-toc-entry button {
+            background: none; border: none; color: var(--accent-color);
+            font-size: 13px; cursor: pointer; padding: 4px 10px;
+        }
+
         input[type="file"] { display: none; }
     </style>
 </head>
@@ -783,6 +874,20 @@
             <div class="progress-info" id="progress-info">0%</div>
         </div>
     </div>
+
+    <!-- 章节导航控制面板 -->
+    <div class="reader-nav-menu" id="reader-nav-menu">
+        <div class="rnav-chapter-label" id="rnav-chapter-label">书籍开头</div>
+        <div class="rnav-slider-row">
+            <button class="rnav-chapter-btn" id="rnav-prev-chapter">上一章</button>
+            <div class="rnav-slider-wrap">
+                <div class="rnav-slider-tip" id="rnav-slider-tip"></div>
+                <input type="range" class="rnav-slider" id="rnav-slider" min="0" max="0" value="0" step="1">
+            </div>
+            <button class="rnav-chapter-btn" id="rnav-next-chapter">下一章</button>
+        </div>
+        <div class="rnav-toc-entry"><button id="rnav-toc-btn">打开目录</button></div>
+    </div>
     
     <input type="file" id="book-file-input" accept=".txt">
     <input type="file" id="ai-avatar-input" accept="image/*">
@@ -1047,6 +1152,13 @@
             readerStatusBar: document.getElementById('reader-status-bar'),
             chapterInfo: document.getElementById('chapter-info'),
             progressInfo: document.getElementById('progress-info'),
+            readerNavMenu: document.getElementById('reader-nav-menu'),
+            rnavChapterLabel: document.getElementById('rnav-chapter-label'),
+            rnavPrevChapter: document.getElementById('rnav-prev-chapter'),
+            rnavNextChapter: document.getElementById('rnav-next-chapter'),
+            rnavSlider: document.getElementById('rnav-slider'),
+            rnavSliderTip: document.getElementById('rnav-slider-tip'),
+            rnavTocBtn: document.getElementById('rnav-toc-btn'),
             searchModal: document.getElementById('search-modal'),
             searchInput: document.getElementById('search-input'),
             doSearchBtn: document.getElementById('do-search-btn'),
@@ -1137,6 +1249,8 @@
                 statusBarTimeout: null,
                 isStatusBarVisible: false,
                 preventFlipOnce: false, // NEW: Flag to prevent flip on selection interaction
+                isNavMenuVisible: false, // 章节导航面板是否显示
+                isDraggingSlider: false, // 是否正在拖动章节滑块
             },
             longPressTimer: null,
             selection: {
@@ -1215,6 +1329,7 @@
             activeBook.currentChapter = currentChapterTitle;
             dom.chapterInfo.textContent = currentChapterTitle;
             showStatusBar();
+            if (state.reading.isNavMenuVisible) syncNavMenu();
 
             // 章节切换检测：向前进入新章节时，触发「读完一章的小互动」与「共读心情」
             if (prevChapterTitle && prevChapterTitle !== currentChapterTitle && typeof triggerChapterEndQuestion === 'function') {
@@ -1242,6 +1357,89 @@
             state.reading.isStatusBarVisible = false;
         };
 
+        // ===== 章节导航面板 =====
+        // 根据当前阅读进度得到所处章节的索引
+        const getCurrentChapterIndex = () => {
+            const activeBook = getActiveBook();
+            if (!activeBook || !Array.isArray(activeBook.toc) || activeBook.toc.length === 0) return 0;
+            const idx = activeBook.toc.findIndex(t => t.title === activeBook.currentChapter);
+            return idx < 0 ? 0 : idx;
+        };
+
+        // 跳转到指定索引的章节
+        const jumpToChapterIndex = (idx) => {
+            const activeBook = getActiveBook();
+            if (!activeBook || !Array.isArray(activeBook.toc)) return;
+            const clamped = Math.max(0, Math.min(activeBook.toc.length - 1, idx));
+            const item = activeBook.toc[clamped];
+            if (!item) return;
+            const anchor = document.getElementById(`para-id-${item.paraIndex}`);
+            if (anchor) {
+                if (state.settings.reading.paginationMode === 'flip') {
+                    anchor.scrollIntoView({ block: 'nearest', inline: 'start' });
+                } else {
+                    anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+            // 主动更新一次，让面板信息立即反映跳转结果
+            setTimeout(updateReadingProgress, 60);
+        };
+
+        // 更新滑块提示气泡的位置与文字
+        const updateSliderTip = (chapterIdx) => {
+            const activeBook = getActiveBook();
+            if (!activeBook || !activeBook.toc || !activeBook.toc[chapterIdx]) return;
+            const slider = dom.rnavSlider;
+            const max = parseInt(slider.max, 10) || 0;
+            const frac = max > 0 ? chapterIdx / max : 0;
+            const wrapWidth = slider.getBoundingClientRect().width;
+            const thumb = 18;
+            const x = frac * (wrapWidth - thumb) + thumb / 2;
+            dom.rnavSliderTip.style.left = `${x}px`;
+            dom.rnavSliderTip.textContent = activeBook.toc[chapterIdx].title;
+        };
+
+        // 同步面板上的滑块 / 按钮 / 标题到当前阅读位置
+        const syncNavMenu = () => {
+            const activeBook = getActiveBook();
+            if (!activeBook || !Array.isArray(activeBook.toc) || activeBook.toc.length === 0) {
+                dom.rnavSlider.max = 0;
+                dom.rnavSlider.value = 0;
+                dom.rnavPrevChapter.disabled = true;
+                dom.rnavNextChapter.disabled = true;
+                dom.rnavChapterLabel.textContent = activeBook ? '书籍开头' : '未选择书籍';
+                return;
+            }
+            const total = activeBook.toc.length;
+            const curIdx = getCurrentChapterIndex();
+            dom.rnavSlider.max = total - 1;
+            if (!state.reading.isDraggingSlider) dom.rnavSlider.value = curIdx;
+            dom.rnavPrevChapter.disabled = curIdx <= 0;
+            dom.rnavNextChapter.disabled = curIdx >= total - 1;
+            dom.rnavChapterLabel.textContent = `${activeBook.toc[curIdx].title}　(${curIdx + 1}/${total})`;
+        };
+
+        const showReaderNav = () => {
+            if (!getActiveBook()) return;
+            syncNavMenu();
+            dom.readerNavMenu.classList.add('show');
+            state.reading.isNavMenuVisible = true;
+            showStatusBar();
+        };
+
+        const hideReaderNav = () => {
+            if (!state.reading.isNavMenuVisible) return;
+            dom.readerNavMenu.classList.remove('show');
+            dom.rnavSliderTip.classList.remove('show');
+            state.reading.isNavMenuVisible = false;
+        };
+
+        const toggleReaderNav = () => {
+            if (state.reading.isNavMenuVisible) hideReaderNav(); else showReaderNav();
+        };
+
+
+
         const switchView = async (viewId) => {
             if (document.querySelector('.view.active')?.id === 'reader-view' && viewId !== 'reader-view') {
                 await saveCurrentBookProgress();
@@ -1252,6 +1450,7 @@
             dom.navItems.forEach(item => item.classList.toggle('active', item.dataset.view === viewId));
             if (viewId !== 'reader-view') {
                 hideSelectionMenu();
+                hideReaderNav();
                 dom.readerProgressContainer.style.display = 'none';
                 if (dom.readerBubble) dom.readerBubble.classList.remove('show');
                 if (typeof stopReadCareTimer === 'function') stopReadCareTimer();
@@ -3510,9 +3709,8 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
 
         // Flip Click Logic (Fixed)
         dom.readerContentWrapper.addEventListener('click', (e) => {
-            if(state.settings.reading.paginationMode !== 'flip') return;
             if(e.target.closest('.comment-icon') || e.target.closest('.comment-popup')) return;
-            
+
             // 1. Check previous interaction state (clearing selection/menu)
             if (state.reading.preventFlipOnce) {
                 state.reading.preventFlipOnce = false; // Reset flag
@@ -3523,29 +3721,72 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             if (window.getSelection().toString().length > 0) {
                 return; // Stop flip, let the selection menu appear
             }
-            
-            const width = dom.readerContentWrapper.getBoundingClientRect().width;
-            const x = e.clientX;
+
             const rect = dom.readerContentWrapper.getBoundingClientRect();
-            const relativeX = x - rect.left;
-            
-            // Calculate current scroll position (page index)
-            const currentScroll = dom.readerContentWrapper.scrollLeft;
-            const currentPage = Math.round(currentScroll / width);
-            
-            // 30% zones left and right
-            if (relativeX < width * 0.3) {
-                // Prev Page (Scroll to specific page index to ensure alignment)
-                const targetPage = Math.max(0, currentPage - 1);
-                dom.readerContentWrapper.scrollTo({ left: targetPage * width, behavior: 'smooth' });
-            } else if (relativeX > width * 0.7) {
-                // Next Page
-                const targetPage = currentPage + 1; // Limit checked by scroll bounds automatically
-                dom.readerContentWrapper.scrollTo({ left: targetPage * width, behavior: 'smooth' });
+            const width = rect.width;
+            const relativeX = e.clientX - rect.left;
+            const mode = state.settings.reading.paginationMode;
+
+            if (mode === 'flip') {
+                // Calculate current scroll position (page index)
+                const currentScroll = dom.readerContentWrapper.scrollLeft;
+                const currentPage = Math.round(currentScroll / width);
+
+                // 30% zones left and right
+                if (relativeX < width * 0.3) {
+                    // Prev Page (Scroll to specific page index to ensure alignment)
+                    hideReaderNav();
+                    const targetPage = Math.max(0, currentPage - 1);
+                    dom.readerContentWrapper.scrollTo({ left: targetPage * width, behavior: 'smooth' });
+                } else if (relativeX > width * 0.7) {
+                    // Next Page
+                    hideReaderNav();
+                    const targetPage = currentPage + 1; // Limit checked by scroll bounds automatically
+                    dom.readerContentWrapper.scrollTo({ left: targetPage * width, behavior: 'smooth' });
+                } else {
+                    // 中央区域：切换章节导航面板
+                    toggleReaderNav();
+                }
             } else {
-                if (state.reading.isStatusBarVisible) hideStatusBar(); else showStatusBar();
+                // 滚动模式：点击中央区域切换章节导航面板
+                if (relativeX > width * 0.3 && relativeX < width * 0.7) {
+                    toggleReaderNav();
+                }
             }
         });
+
+        // 章节导航面板：阻止面板内部点击冒泡导致误关闭
+        dom.readerNavMenu.addEventListener('click', (e) => e.stopPropagation());
+
+        // 上一章 / 下一章
+        dom.rnavPrevChapter.addEventListener('click', () => {
+            jumpToChapterIndex(getCurrentChapterIndex() - 1);
+        });
+        dom.rnavNextChapter.addEventListener('click', () => {
+            jumpToChapterIndex(getCurrentChapterIndex() + 1);
+        });
+
+        // 章节滑块：拖动时显示章节名提示，松开后跳转
+        dom.rnavSlider.addEventListener('input', () => {
+            state.reading.isDraggingSlider = true;
+            const idx = parseInt(dom.rnavSlider.value, 10) || 0;
+            dom.rnavSliderTip.classList.add('show');
+            updateSliderTip(idx);
+        });
+        const commitSliderJump = () => {
+            if (!state.reading.isDraggingSlider) return;
+            const idx = parseInt(dom.rnavSlider.value, 10) || 0;
+            state.reading.isDraggingSlider = false;
+            dom.rnavSliderTip.classList.remove('show');
+            jumpToChapterIndex(idx);
+        };
+        dom.rnavSlider.addEventListener('change', commitSliderJump);
+        // 触摸/鼠标松开兜底，确保拖动结束后一定跳转
+        dom.rnavSlider.addEventListener('mouseup', commitSliderJump);
+        dom.rnavSlider.addEventListener('touchend', commitSliderJump);
+
+        // 面板内打开目录
+        dom.rnavTocBtn.addEventListener('click', () => { hideReaderNav(); toggleTOC(true); });
 
         // Event Listeners ... (Existing ones)
         dom.sendBtn.addEventListener('click', handleSendMessage);
