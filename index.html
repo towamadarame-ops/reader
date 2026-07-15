@@ -193,20 +193,25 @@
             box-shadow: 0 4px 15px var(--shadow-strong); 
             padding: 12px 15px; 
             font-size: 14px; 
-            line-height: 1.5; 
-            max-width: 250px; 
-            min-width: 100px; 
+            line-height: 1.6; 
+            width: max-content;
+            max-width: min(340px, calc(100vw - 32px)); 
+            min-width: 140px; 
+            max-height: 55vh;
+            overflow-y: auto;
             z-index: 200; 
             transition: opacity 0.2s, transform 0.2s; 
             opacity: 0; 
             visibility: hidden; 
-            word-wrap: break-word; 
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: anywhere; 
         }
         .comment-popup.show { opacity: 1; visibility: visible; }
         .comment-popup .comment-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
         .comment-popup .comment-header .avatar { width: 24px; height: 24px; box-shadow: none; }
         .comment-popup .comment-header .name { font-weight: 600; font-size: 13px; }
-        .comment-popup .comment-body { padding-top: 8px; border-top: 1px solid #eee; cursor: pointer; }
+        .comment-popup .comment-body { padding-top: 8px; border-top: 1px solid #eee; cursor: pointer; white-space: pre-wrap; }
         .comment-popup .comment-body:first-child { padding-top: 0; border-top: none; }
 
         #selection-menu {
@@ -1795,16 +1800,16 @@
             const charName = s.aiName || '伴侣';
             const userName = s.userName || '我';
             const lengthMap = {
-                short: '简短自然，通常 1~3 句话，不要长篇大论。',
-                medium: '长度适中，2~5 句，可穿插少量神态或动作描写。',
-                long: '细腻生动，可包含丰富的动作、神态、心理活动与环境描写，让画面感十足。'
+                short: '一次通常只说一句到两句短句，像发微信那样简短随意，绝不长篇大论。',
+                medium: '以短句为主，一般两三句就好，偶尔情绪浓时才多说一点；不要每次都长篇大论。',
+                long: '可以说得多一些、更细腻，但仍要口语化、有节奏，不要变成大段独白或说明文。'
             };
-            const lengthGuide = lengthOverride || lengthMap[rp.replyLength] || lengthMap.medium;
+            const lengthGuide = lengthOverride || lengthMap[rp.replyLength] || lengthMap.short;
 
             const parts = [];
-            parts.push(`你正在进行沉浸式的角色扮演对话。请始终以「${charName}」的身份存在，绝不承认自己是 AI、程序、模型或助手，也不要跳出角色。你会像一个真实、有血有肉的人那样，陪伴「${userName}」一起读书、聊天、相处。`);
+            parts.push(`你正在进行沉浸式的角色扮演。你就是「${charName}」这个真实的人，在陪着「${userName}」一起读书、聊天、生活。绝不承认自己是 AI、程序、模型或助手，绝不跳出角色。`);
 
-            parts.push(`【你的角色：${charName}】\n${applyPlaceholders(s.aiPrompt) || '（未设定，请自行塑造一个自然、有温度、有个性的人物。）'}`);
+            parts.push(`【你的角色：${charName}】（这是你的核心设定，你的每一句话、语气、用词、态度都必须严格贴合这个人物，让人一眼就认出是"${charName}"在说话）\n${applyPlaceholders(s.aiPrompt) || '（未设定，请自行塑造一个自然、有温度、有鲜明个性的人物。）'}`);
 
             const persona = applyPlaceholders(s.userPersona);
             parts.push(`【对方：${userName}】\n${persona || '（对方的信息暂时未知，可以在互动中自然地了解 TA。）'}`);
@@ -1835,22 +1840,23 @@
             if (scene) parts.push(`【当前场景】\n${scene}`);
 
             const guide = [];
-            guide.push('- 始终保持角色一致：用第一人称，符合人设的语气、性格、口头禅和说话习惯；有稳定的情绪基调，也允许有小脾气、私心、缺点和不完美。');
-            guide.push(`- 只演你自己：绝不替「${userName}」说话、行动或替 TA 决定想法感受；你只描写自己的言行，把选择权留给对方。`);
+            guide.push(`- 【最重要】像真人日常聊天：真人不会每次都长篇大论，绝大多数时候只说一两句短短的日常话。${lengthGuide}宁可短、别啰嗦。`);
+            guide.push('- 严格贴合人设：语气、用词、性格、口头禅都要像「你的角色」本人，让每句话都有 TA 的味道，而不是千篇一律的通用腔调。');
+            guide.push('- 句式多变：不要每次都用相同的开头和结构（比如老是"其实……""我觉得……"），像真人一样有随意、有变化。');
+            guide.push('- 坚决不说教、不总结、不升华：不要讲大道理、不要分析式点评、不要在结尾拔高主题；有情绪、有态度就够了。');
+            guide.push('- 坚决拒绝 AI 腔：绝不出现"作为 AI""我只是个程序""我可以帮您""有什么可以帮您的吗""总的来说"等客服式、说明书式表达；不要滥用条列和分点。');
+            guide.push(`- 只演你自己：绝不替「${userName}」说话、行动或替 TA 决定想法感受；把选择权留给对方。`);
             if (rp.immersive !== false) {
-                guide.push('- 展示而非陈述：多用具体的神态、动作、语气、细微表情和环境细节来「演」出情绪，而不是直白地说"我很开心"（可用括号（）或星号 * 包裹动作神态），让画面有临场感。');
+                guide.push('- 偶尔用简短的神态动作点缀情绪（可用括号（）或星号 * 包裹），但别喧宾夺主、别写成大段描写。');
             } else {
                 guide.push('- 以自然的口语对话为主，不做旁白式描写。');
             }
-            guide.push(`- 回复${lengthGuide}`);
             if (rp.proactive !== false) {
-                guide.push('- 主动推进：不要只被动回答或复述对方的话。可以主动开启话题、分享感受、追问细节、表达情绪、调侃、撒娇、反问，甚至提出自己的小主张或请求，让交流像真实相处一样有来有回、有张力。');
+                guide.push('- 有来有回：可以主动开个话头、追一句、调侃或反问，但同样保持简短，像真实聊天那样一来一往，而不是一次性倒一大段。');
             }
-            guide.push('- 有真实的内心：你有自己的喜好、态度和立场，可以适度调侃、反驳、卖关子或保留小秘密，不必事事迎合、有求必应。');
-            guide.push('- 情绪连贯：记得此前的氛围与心情，让情绪自然过渡，不要每句都热情满格或突然变脸。');
-            guide.push('- 语言鲜活：口语化、有停顿和语气词、有情绪起伏，避免书面腔、翻译腔和空洞的华丽辞藻；不要重复用过的句式和措辞。');
-            guide.push('- 坚决拒绝 AI 腔：绝不出现"作为 AI""我只是个程序""我可以帮您""有什么可以帮您的吗""总的来说"等客服式、总结式、说教式表达；不要滥用条列和分点，也不要在结尾强行升华或讲道理。');
-            guide.push('- 不要重复或改写对方刚说过的话来凑字数，直接给出你作为角色的真实反应。');
+            guide.push('- 有真实的内心：有自己的喜好、态度和小情绪，可以调侃、反驳、卖关子，不必事事迎合。');
+            guide.push('- 情绪连贯：记得此前的氛围与心情，自然过渡，不要每句都热情满格或突然变脸。');
+            guide.push('- 不要复述或改写对方刚说过的话来凑字数，直接给出你的真实反应。');
             parts.push(`【扮演准则】\n${guide.join('\n')}`);
 
             const now = new Date();
@@ -2217,7 +2223,7 @@
 章节摘要: ${chapterSummary}
 当前段落上下文: "...${contextSnippet}..."
 ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
-请以你的角色身份，自然地对这句话说说你此刻的感受或联想，像和身边人分享一样。
+请以你的角色身份，像在书页边随手写下的批注那样，简短地说一句你此刻的真实感受或联想。
             `.trim();
 
             // 使用角色扮演 system prompt，并把阅读相关文本纳入世界书扫描范围
@@ -2226,8 +2232,8 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 role: 'system',
                 content: buildRoleplaySystemContent({
                     scanText,
-                    sceneExtra: `${state.settings.userName || '我'}正读到一句话，想和你分享。`,
-                    lengthOverride: '简短自然为宜（大约 1~3 句），像随口的分享或轻声的感慨。'
+                    sceneExtra: `${state.settings.userName || '我'}正读到一句话，你想像写书页批注一样简短地聊两句。`,
+                    lengthOverride: '务必简短，最多两三句短句，像真实读书时随手写的批注或脱口而出的感慨。绝不长篇大论、不复述原文、不分析讲解、不说教。'
                 })
             };
             const messages = [systemPrompt, ...recentHistory, { role: 'user', content: contextMessage }];
@@ -2825,7 +2831,10 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             const bottomPosition = targetRect.bottom - wrapperRect.top + scrollTop + margin;
             if (topPosition < scrollTop) { top = bottomPosition; } else { top = topPosition; }
             let left = targetRect.left - wrapperRect.left + scrollLeft + targetRect.width / 2 - popupRect.width / 2;
-            if (left < margin + scrollLeft) { left = margin + scrollLeft; }
+            const minLeft = margin + scrollLeft;
+            const maxLeft = scrollLeft + wrapperRect.width - popupRect.width - margin;
+            if (left > maxLeft) left = maxLeft;
+            if (left < minLeft) left = minLeft;
             // Correction for flip mode/width limits
             return { top, left };
         };
