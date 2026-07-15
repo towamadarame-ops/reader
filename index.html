@@ -1793,6 +1793,25 @@
             return picked.join('\n');
         };
 
+        // 汇总「从书籍开头到当前章节」的已读剧情梗概（基于章节摘要），作为角色对剧情/人物的记忆
+        const getStorySoFar = (book, currentChapterTitle) => {
+            if (!book) return '';
+            const toc = book.toc || [];
+            const sums = state.summaries[book.title] || {};
+            let curIdx = toc.findIndex(t => t.title === currentChapterTitle);
+            if (curIdx < 0) curIdx = toc.length - 1;
+            const lines = [];
+            for (let i = 0; i <= curIdx && i < toc.length; i++) {
+                const t = toc[i].title;
+                const sm = sums[t];
+                if (sm && sm.trim()) lines.push(`${t}：${sm.trim()}`);
+            }
+            // 控制长度：过长时优先保留靠近当前进度的章节（最相关）
+            let joined = lines.join('\n');
+            while (joined.length > 2600 && lines.length > 1) { lines.shift(); joined = lines.join('\n'); }
+            return joined;
+        };
+
         // 构建角色扮演式 system prompt（对话与阅读评论共用）
         const buildRoleplaySystemContent = ({ scanText = '', sceneExtra = '', lengthOverride = '' } = {}) => {
             const s = state.settings;
@@ -1838,6 +1857,17 @@
             }
             if (sceneExtra) scene += (scene ? ' ' : '') + sceneExtra;
             if (scene) parts.push(`【当前场景】\n${scene}`);
+
+            // 注入已读剧情，让角色真正理解剧情脉络与人物，而非孤立分析一句话
+            if (activeBook?.title) {
+                const story = getStorySoFar(activeBook, activeBook.currentChapter);
+                if (story) {
+                    parts.push(`【本书已读剧情（截至当前进度，你和${userName}都已读过，请当作共同记忆，理解人物关系与故事走向，聊起来要显得你真的读懂了剧情）】\n${story}`);
+                } else {
+                    parts.push(`【提示】这本书还没有生成章节梗概，你对整体剧情的了解有限。可以基于眼前读到的内容聊，但不要不懂装懂地编造后续情节。`);
+                }
+            }
+
 
             const guide = [];
             guide.push(`- 【最重要】像真人日常聊天：真人不会每次都长篇大论，绝大多数时候只说一两句短短的日常话。${lengthGuide}宁可短、别啰嗦。`);
@@ -2210,7 +2240,8 @@
             }
             const bookSummaries = state.summaries[activeBook.title] || {};
             const chapterSummary = bookSummaries[currentChapter.title] || '暂无摘要';
-            const contextSnippet = (activeBook.paragraphs.slice(Math.max(0, paraId - 2), paraId + 3).join(' ')).substring(0, 500);
+            // 扩大上下文窗口：取当前句所在处前后更大范围，让角色看清这一段在情节中的来龙去脉
+            const contextSnippet = (activeBook.paragraphs.slice(Math.max(0, paraId - 6), paraId + 7).join('\n')).substring(0, 1600);
 
             // Context Enhanced: Include recent history
             const contextRounds = parseInt((state.settings.memory || {}).contextRounds, 10) || 10;
@@ -2219,11 +2250,11 @@
             const contextMessage = `
 [阅读上下文]
 书名:《${activeBook.title}》
-章节: ${currentChapter.title}
-章节摘要: ${chapterSummary}
-当前段落上下文: "...${contextSnippet}..."
+当前章节: ${currentChapter.title}
+本章梗概: ${chapterSummary}
+这一处前后的原文: "...${contextSnippet}..."
 ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
-请以你的角色身份，像在书页边随手写下的批注那样，简短地说一句你此刻的真实感受或联想。
+请结合已读剧情和人物关系，以你的角色身份，像在书页边随手写下的批注那样，简短说一两句你此刻的真实反应——可以是对人物处境的心疼/吐槽、对情节的猜测或共鸣。要显得你真的读懂了故事，但别复述原文、别做分析讲解、别说教。
             `.trim();
 
             // 使用角色扮演 system prompt，并把阅读相关文本纳入世界书扫描范围
