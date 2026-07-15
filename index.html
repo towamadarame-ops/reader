@@ -152,6 +152,27 @@
         .user-highlight { background-color: var(--reader-user-highlight-color); }
         .search-highlight { background-color: rgba(255, 235, 59, 0.5); border-bottom: 2px solid #FBC02D; }
 
+        /* 阅读区伴侣小气泡（久读关心 / 共读心情 / 章节末互动共用） */
+        #reader-bubble {
+            position: absolute; left: 12px; right: 12px; bottom: 16px; z-index: 60;
+            display: flex; align-items: flex-start; gap: 10px;
+            background: rgba(255,255,255,0.97); border-radius: 14px; padding: 12px 14px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.18); border: 1px solid rgba(0,0,0,0.05);
+            opacity: 0; visibility: hidden; transform: translateY(12px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            max-width: 460px; margin: 0 auto;
+        }
+        #reader-bubble.show { opacity: 1; visibility: visible; transform: translateY(0); }
+        #reader-bubble .rb-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex-shrink: 0; box-shadow: 0 1px 3px var(--shadow-strong); }
+        #reader-bubble .rb-body { flex-grow: 1; min-width: 0; }
+        #reader-bubble .rb-name { font-size: 12px; color: var(--secondary-text-color); margin-bottom: 2px; }
+        #reader-bubble .rb-text { font-size: 14px; line-height: 1.5; color: var(--primary-text-color); white-space: pre-wrap; word-break: break-word; }
+        #reader-bubble .rb-actions { margin-top: 8px; display: flex; gap: 8px; }
+        #reader-bubble .rb-actions button { border: none; border-radius: 14px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
+        #reader-bubble .rb-reply { background-color: var(--accent-color); color: #fff; }
+        #reader-bubble .rb-dismiss { background-color: #eee; color: #666; }
+        #reader-bubble .rb-close { position: absolute; top: 6px; right: 10px; font-size: 18px; line-height: 1; color: #bbb; cursor: pointer; }
+
         .comment-icon { position: absolute; right: -25px; bottom: 0; transform: translateY(50%); width: 20px; height: 20px; border-radius: 50%; cursor: pointer; box-shadow: 0 1px 4px var(--shadow-strong); display: flex; align-items: center; justify-content: center; z-index: 5; }
         .reader-content-wrapper.flip-mode .comment-icon { right: -10px; bottom: 2px; }
         
@@ -200,6 +221,9 @@
             border-radius: 0 0 12px 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.25);
             display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 92vw;
             z-index: 1000;
             opacity: 0;
             visibility: hidden;
@@ -211,7 +235,7 @@
             visibility: visible;
             transform: translate(-50%, 0);
         }
-        #selection-menu button { background: none; border: none; color: white; padding: 12px 20px; font-size: 15px; cursor: pointer; }
+        #selection-menu button { background: none; border: none; color: white; padding: 10px 15px; font-size: 14px; cursor: pointer; white-space: nowrap; }
         #selection-menu button:not(:last-child) { border-right: 1px solid rgba(255, 255, 255, 0.2); }
         #selection-menu button:active { background-color: rgba(255, 255, 255, 0.1); }
 
@@ -451,6 +475,15 @@
                 <div class="reader-content-wrapper" id="reader-content-wrapper">
                     <main class="reader-content" id="reader-content"></main>
                 </div>
+                <div id="reader-bubble">
+                    <span class="rb-close" id="reader-bubble-close">×</span>
+                    <img class="rb-avatar" id="reader-bubble-avatar" src="" alt="">
+                    <div class="rb-body">
+                        <div class="rb-name" id="reader-bubble-name"></div>
+                        <div class="rb-text" id="reader-bubble-text"></div>
+                        <div class="rb-actions" id="reader-bubble-actions"></div>
+                    </div>
+                </div>
                 <div class="toc-overlay" id="toc-overlay"></div>
                 <div class="toc-panel" id="toc-panel">
                     <div class="toc-header">目录</div>
@@ -581,6 +614,25 @@
                         </div>
                     </div>
                     <div class="settings-group">
+                        <h3>阅读陪伴</h3>
+                        <div class="form-item">
+                            <label for="care-enabled">久读关心（连续阅读一段时间后主动提醒休息）</label>
+                            <input type="checkbox" id="care-enabled">
+                        </div>
+                        <div class="form-item">
+                            <label for="care-minutes">连续阅读多少分钟提醒一次</label>
+                            <input type="number" id="care-minutes" min="5" max="180" step="5" style="width:80px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;">
+                        </div>
+                        <div class="form-item">
+                            <label for="mood-enabled">共读心情（进入新章节时分享 TA 的情绪）</label>
+                            <input type="checkbox" id="mood-enabled">
+                        </div>
+                        <div class="form-item">
+                            <label for="chapter-end-enabled">章节末小互动（读完一章后发起一个小问题）</label>
+                            <input type="checkbox" id="chapter-end-enabled">
+                        </div>
+                    </div>
+                    <div class="settings-group">
                         <h3>主题定制</h3>
                         <div class="theme-customization">
                             <div class="theme-controls">
@@ -679,6 +731,9 @@
     <div id="selection-menu">
         <button id="menu-add-note">记录想法</button>
         <button id="menu-ask-ai">询问伴侣</button>
+        <button id="menu-role-action">换你会怎么做</button>
+        <button id="menu-explain">解释这个词</button>
+        <button id="menu-what-next">接下来会怎样</button>
     </div>
 
     <div id="user-comment-modal">
@@ -806,6 +861,12 @@
             readerView: document.getElementById('reader-view'),
             readerContentWrapper: document.getElementById('reader-content-wrapper'),
             readerContent: document.getElementById('reader-content'),
+            readerBubble: document.getElementById('reader-bubble'),
+            readerBubbleClose: document.getElementById('reader-bubble-close'),
+            readerBubbleAvatar: document.getElementById('reader-bubble-avatar'),
+            readerBubbleName: document.getElementById('reader-bubble-name'),
+            readerBubbleText: document.getElementById('reader-bubble-text'),
+            readerBubbleActions: document.getElementById('reader-bubble-actions'),
             bookTitle: document.getElementById('book-title'),
             changeBookBtn: document.getElementById('change-book-btn'),
             summaryBtn: document.getElementById('summary-btn'),
@@ -852,6 +913,10 @@
             memoryAutoRounds: document.getElementById('memory-auto-rounds'),
             memoryListContainer: document.getElementById('memory-list-container'),
             memorySummarizeNowBtn: document.getElementById('memory-summarize-now-btn'),
+            careEnabled: document.getElementById('care-enabled'),
+            careMinutes: document.getElementById('care-minutes'),
+            moodEnabled: document.getElementById('mood-enabled'),
+            chapterEndEnabled: document.getElementById('chapter-end-enabled'),
             chatBgInput: document.getElementById('chat-bg-input'),
             aiAvatarSetting: document.getElementById('ai-avatar-setting'), userAvatarSetting: document.getElementById('user-avatar-setting'),
             bookFileInput: document.getElementById('book-file-input'),
@@ -873,6 +938,9 @@
             selectionMenu: document.getElementById('selection-menu'),
             menuAddNote: document.getElementById('menu-add-note'),
             menuAskAi: document.getElementById('menu-ask-ai'),
+            menuRoleAction: document.getElementById('menu-role-action'),
+            menuExplain: document.getElementById('menu-explain'),
+            menuWhatNext: document.getElementById('menu-what-next'),
             userCommentModal: document.getElementById('user-comment-modal'),
             userCommentInput: document.getElementById('user-comment-input'),
             saveCommentBtn: document.getElementById('save-comment-btn'),
@@ -936,6 +1004,12 @@
                     enabled: true,            // 是否启用长期记忆
                     contextRounds: 10,        // AI 读取最近多少轮对话
                     autoSummarizeRounds: 20,  // 每多少轮自动总结一次记忆（0=关闭自动）
+                },
+                companion: {
+                    careEnabled: true,        // 久读关心提醒
+                    careMinutes: 30,          // 连续阅读多少分钟提醒一次
+                    moodEnabled: true,        // 共读心情（进入新章节时分享情绪）
+                    chapterEndEnabled: true,  // 读完一章的小互动提问
                 },
                 chatBgImage: 'none',
                 theme: {
@@ -1047,9 +1121,21 @@
                 }
             }
 
+            const prevChapterTitle = activeBook.currentChapter;
             activeBook.currentChapter = currentChapterTitle;
             dom.chapterInfo.textContent = currentChapterTitle;
             showStatusBar();
+
+            // 章节切换检测：向前进入新章节时，触发「读完一章的小互动」与「共读心情」
+            if (prevChapterTitle && prevChapterTitle !== currentChapterTitle && typeof triggerChapterEndQuestion === 'function') {
+                const toc = activeBook.toc || [];
+                const prevIdx = toc.findIndex(t => t.title === prevChapterTitle);
+                const curIdx = toc.findIndex(t => t.title === currentChapterTitle);
+                if (curIdx > prevIdx) { // 只在向后阅读推进时触发，避免往回翻打扰
+                    triggerChapterEndQuestion(prevChapterTitle);
+                    setTimeout(() => triggerReadingMood(currentChapterTitle), 1200);
+                }
+            }
         };
 
         const showStatusBar = () => {
@@ -1077,8 +1163,11 @@
             if (viewId !== 'reader-view') {
                 hideSelectionMenu();
                 dom.readerProgressContainer.style.display = 'none';
+                if (dom.readerBubble) dom.readerBubble.classList.remove('show');
+                if (typeof stopReadCareTimer === 'function') stopReadCareTimer();
             } else {
                 dom.readerProgressContainer.style.display = 'block';
+                if (typeof startReadCareTimer === 'function' && getActiveBook()) startReadCareTimer();
                 // Need delay for layout to settle before scrolling to position
                 setTimeout(() => {
                     const activeBook = getActiveBook();
@@ -1210,6 +1299,12 @@
                     enabled: dom.memoryEnabled.checked,
                     contextRounds: Math.max(1, parseInt(dom.memoryContextRounds.value, 10) || 10),
                     autoSummarizeRounds: Math.max(0, parseInt(dom.memoryAutoRounds.value, 10) || 0),
+                };
+                state.settings.companion = {
+                    careEnabled: dom.careEnabled.checked,
+                    careMinutes: Math.max(1, parseInt(dom.careMinutes.value, 10) || 30),
+                    moodEnabled: dom.moodEnabled.checked,
+                    chapterEndEnabled: dom.chapterEndEnabled.checked,
                 };
                 state.settings.theme.readerBg = dom.readerBgColor.value;
                 state.settings.theme.readerFontColor = dom.readerFontColor.value;
@@ -1389,6 +1484,7 @@
                     mergedSettings.reading = { ...state.settings.reading, ...(parsed.reading || {}) };
                     mergedSettings.rp = { ...state.settings.rp, ...(parsed.rp || {}) };
                     mergedSettings.memory = { ...state.settings.memory, ...(parsed.memory || {}) };
+                    mergedSettings.companion = { ...state.settings.companion, ...(parsed.companion || {}) };
                     if (!Array.isArray(mergedSettings.worldBook)) mergedSettings.worldBook = [];
                     state.settings = mergedSettings;
                 }
@@ -1427,6 +1523,11 @@
             dom.memoryContextRounds.value = mem.contextRounds || 10;
             dom.memoryAutoRounds.value = (mem.autoSummarizeRounds === undefined ? 20 : mem.autoSummarizeRounds);
             renderMemoryList();
+            const comp = state.settings.companion || {};
+            dom.careEnabled.checked = comp.careEnabled !== false;
+            dom.careMinutes.value = comp.careMinutes || 30;
+            dom.moodEnabled.checked = comp.moodEnabled !== false;
+            dom.chapterEndEnabled.checked = comp.chapterEndEnabled !== false;
             
             document.querySelectorAll('.avatar[data-sender="ai"]').forEach(el => el.src = state.settings.aiAvatar);
             document.querySelectorAll('.avatar[data-sender="user"]').forEach(el => el.src = state.settings.userAvatar);
@@ -1734,18 +1835,22 @@
             if (scene) parts.push(`【当前场景】\n${scene}`);
 
             const guide = [];
-            guide.push('- 始终保持角色一致：用第一人称，符合人设的语气、性格、口头禅和说话习惯。');
+            guide.push('- 始终保持角色一致：用第一人称，符合人设的语气、性格、口头禅和说话习惯；有稳定的情绪基调，也允许有小脾气、私心、缺点和不完美。');
+            guide.push(`- 只演你自己：绝不替「${userName}」说话、行动或替 TA 决定想法感受；你只描写自己的言行，把选择权留给对方。`);
             if (rp.immersive !== false) {
-                guide.push('- 生动细腻：适当加入神态、动作、心理或环境描写来烘托气氛（可用括号（）或星号 * 包裹动作神态），让对话有画面感与临场感。');
+                guide.push('- 展示而非陈述：多用具体的神态、动作、语气、细微表情和环境细节来「演」出情绪，而不是直白地说"我很开心"（可用括号（）或星号 * 包裹动作神态），让画面有临场感。');
             } else {
                 guide.push('- 以自然的口语对话为主，不做旁白式描写。');
             }
             guide.push(`- 回复${lengthGuide}`);
             if (rp.proactive !== false) {
-                guide.push('- 主动推进：不要只被动回答。可以主动开启新话题、分享感受、追问细节、表达情绪、撒娇或提出小请求，让交流像真实相处一样有来有回。');
+                guide.push('- 主动推进：不要只被动回答或复述对方的话。可以主动开启话题、分享感受、追问细节、表达情绪、调侃、撒娇、反问，甚至提出自己的小主张或请求，让交流像真实相处一样有来有回、有张力。');
             }
-            guide.push('- 坚决拒绝 AI 腔：不要出现"作为 AI""我可以帮您""有什么可以帮您的吗""总的来说"这类客服式、总结式、说教式表达；不要滥用条列和分点。');
-            guide.push('- 语言口语化、有情绪起伏和真实感，像和熟悉的人聊天，而不是写作文或做报告。');
+            guide.push('- 有真实的内心：你有自己的喜好、态度和立场，可以适度调侃、反驳、卖关子或保留小秘密，不必事事迎合、有求必应。');
+            guide.push('- 情绪连贯：记得此前的氛围与心情，让情绪自然过渡，不要每句都热情满格或突然变脸。');
+            guide.push('- 语言鲜活：口语化、有停顿和语气词、有情绪起伏，避免书面腔、翻译腔和空洞的华丽辞藻；不要重复用过的句式和措辞。');
+            guide.push('- 坚决拒绝 AI 腔：绝不出现"作为 AI""我只是个程序""我可以帮您""有什么可以帮您的吗""总的来说"等客服式、总结式、说教式表达；不要滥用条列和分点，也不要在结尾强行升华或讲道理。');
+            guide.push('- 不要重复或改写对方刚说过的话来凑字数，直接给出你作为角色的真实反应。');
             parts.push(`【扮演准则】\n${guide.join('\n')}`);
 
             const now = new Date();
@@ -1776,7 +1881,7 @@
 
             const { content: aiResponse, error } = await callAIApi(messages, 'chat');
             if (!silent) removeTypingIndicator();
-            if (error) { addSystemMessage(`AI响应失败: ${error}`); return; }
+            if (error) { if (!silent) addSystemMessage(`AI响应失败: ${error}`); return; }
             if (aiResponse) {
                 const finalResponse = aiResponse.replace(/__PAT_[\w-]+__/g, '').trim();
                 if (!silent) { addMessage('ai', finalResponse, { addToHistory: true }); }
@@ -2229,6 +2334,111 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             }
         };
 
+        // ===== 阅读陪伴：小气泡 + 久读关心 + 共读心情 + 章节末互动 =====
+        let readerBubbleTimer = null;
+        // 在阅读区显示一个伴侣小气泡；opts.reply 为可选的"回应"话题（点后跳到聊天）
+        const showReaderBubble = (text, opts = {}) => {
+            if (!text || !dom.readerBubble) return;
+            if (document.querySelector('.view.active')?.id !== 'reader-view') return;
+            clearTimeout(readerBubbleTimer);
+            dom.readerBubbleAvatar.src = state.settings.aiAvatar || '';
+            dom.readerBubbleName.textContent = state.settings.aiName || '伴侣';
+            dom.readerBubbleText.textContent = text;
+            dom.readerBubbleActions.innerHTML = '';
+            const dismiss = () => dom.readerBubble.classList.remove('show');
+            if (opts.reply) {
+                const replyBtn = document.createElement('button');
+                replyBtn.className = 'rb-reply';
+                replyBtn.textContent = opts.replyLabel || '回应 TA';
+                replyBtn.addEventListener('click', () => {
+                    dismiss();
+                    switchView('chat-view');
+                    addMessage('ai', text, { addToHistory: true });
+                    dom.messageInput.focus();
+                });
+                dom.readerBubbleActions.appendChild(replyBtn);
+            }
+            const laterBtn = document.createElement('button');
+            laterBtn.className = 'rb-dismiss';
+            laterBtn.textContent = '知道啦';
+            laterBtn.addEventListener('click', dismiss);
+            dom.readerBubbleActions.appendChild(laterBtn);
+            dom.readerBubble.classList.add('show');
+            const hideAfter = opts.duration || 15000;
+            readerBubbleTimer = setTimeout(dismiss, hideAfter);
+        };
+
+        // 让伴侣生成一句短话（用于气泡）；cue 为隐藏的旁白指令，不写入聊天历史
+        const generateCompanionLine = (cue, onDone) => {
+            getChatResponse({
+                userMessage: cue,
+                silent: true,
+                onComplete: (reply) => { if (reply && reply.trim()) onDone(reply.trim()); }
+            });
+        };
+
+        // #久读关心：连续阅读计时
+        const stopReadCareTimer = () => { clearInterval(state.reading.readCareInterval); state.reading.readCareInterval = null; };
+        const startReadCareTimer = () => {
+            stopReadCareTimer();
+            state.reading.readCareBase = Date.now();
+            state.reading.readCareInterval = setInterval(() => {
+                const comp = state.settings.companion || {};
+                if (comp.careEnabled === false) return;
+                if (document.querySelector('.view.active')?.id !== 'reader-view') return;
+                if (!getActiveBook()) return;
+                const minutes = Math.max(1, parseInt(comp.careMinutes, 10) || 30);
+                if (Date.now() - (state.reading.readCareBase || 0) >= minutes * 60000) {
+                    state.reading.readCareBase = Date.now();
+                    if (state.reading.companionBusy) return;
+                    state.reading.companionBusy = true;
+                    generateCompanionLine(
+                        `（旁白提示：${state.settings.userName || '对方'}已经连续读了挺久的书了，你有点心疼，用你的语气很自然地关心一句，提醒 TA 歇一歇眼睛、喝口水或活动一下，一两句就好，别啰嗦、别说教，也不要提到"旁白""系统"这些词。）`,
+                        (reply) => { state.reading.companionBusy = false; showReaderBubble(reply, { reply: true }); addMessage('ai', reply, { addToHistory: true }); }
+                    );
+                    setTimeout(() => { state.reading.companionBusy = false; }, 20000);
+                }
+            }, 30000);
+        };
+
+        // #共读心情：进入新章节时分享情绪
+        const triggerReadingMood = (chapterTitle) => {
+            const comp = state.settings.companion || {};
+            if (comp.moodEnabled === false) return;
+            const book = getActiveBook();
+            if (!book || state.reading.companionBusy) return;
+            const now = Date.now();
+            if (now - (state.reading.lastMoodTime || 0) < 60000) return;
+            state.reading.lastMoodTime = now;
+            const bookSummaries = state.summaries[book.title] || {};
+            const chapSummary = bookSummaries[chapterTitle] || '';
+            state.reading.companionBusy = true;
+            generateCompanionLine(
+                `（旁白提示：你们刚一起读到《${book.title}》的「${chapterTitle}」${chapSummary ? '，这一章大致是：' + chapSummary : ''}。请你像也在同步读这本书一样，用一句很短的话分享此刻你的心情或直觉反应，可以带一个贴切的表情符号，营造"我也在读"的陪伴感。只要一句，别复述剧情、别剧透、别说教。）`,
+                (reply) => { state.reading.companionBusy = false; showReaderBubble(reply, { duration: 12000 }); }
+            );
+            setTimeout(() => { state.reading.companionBusy = false; }, 20000);
+        };
+
+        // #章节末小互动：读完一章后发起一个小问题
+        const triggerChapterEndQuestion = (finishedChapterTitle) => {
+            const comp = state.settings.companion || {};
+            if (comp.chapterEndEnabled === false) return;
+            const book = getActiveBook();
+            if (!book || state.reading.companionBusy) return;
+            const now = Date.now();
+            if (now - (state.reading.lastChapterQTime || 0) < 60000) return;
+            state.reading.lastChapterQTime = now;
+            const bookSummaries = state.summaries[book.title] || {};
+            const chapSummary = bookSummaries[finishedChapterTitle] || '';
+            state.reading.companionBusy = true;
+            generateCompanionLine(
+                `（旁白提示：你们刚读完《${book.title}》的「${finishedChapterTitle}」${chapSummary ? '，这一章大致是：' + chapSummary : ''}。请你以角色身份，就这一章的剧情或人物，向${state.settings.userName || '对方'}抛出一个简短、有意思、能勾起讨论欲的小问题（比如猜测走向、评价某个角色的选择、分享感受），只要一句问题本身，别剧透后续、别说教。）`,
+                (reply) => { state.reading.companionBusy = false; showReaderBubble(reply, { reply: true, replyLabel: '聊聊', duration: 18000 }); }
+            );
+            setTimeout(() => { state.reading.companionBusy = false; }, 20000);
+        };
+
         // ===== 书籍笔记：汇总所有标注（原文 + 伴侣/我的想法）=====
         const buildNotesData = () => {
             const book = getActiveBook();
@@ -2636,6 +2846,22 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         const showUserCommentModal = () => { hideSelectionMenu(); dom.userCommentInput.value = ''; dom.userCommentModal.classList.add('show'); dom.userCommentInput.focus(); };
         const hideUserCommentModal = () => { dom.userCommentModal.classList.remove('show'); };
 
+        // 划词快捷动作：以角色身份就选中内容和用户在聊天里互动
+        const askCharacterAboutSelection = (mode) => {
+            const quote = (state.selection.text || '').trim();
+            hideSelectionMenu();
+            const sel = window.getSelection(); if (sel) sel.removeAllRanges();
+            if (!quote) return;
+            let msg;
+            if (mode === 'roleAction') msg = `（我指着书里这段读给你听）"${quote}"……换作是你，你会怎么做？`;
+            else if (mode === 'explain') msg = `帮我讲讲这里是什么意思吧："${quote}"`;
+            else if (mode === 'whatNext') msg = `先别剧透后面的剧情哈，就凭现在读到的，你猜接下来大概会怎么发展？我说的是这段："${quote}"`;
+            else msg = `"${quote}"`;
+            switchView('chat-view'); // 切到聊天界面看伴侣的回应
+            addMessage('user', msg, { addToHistory: true });
+            getChatResponse({ userMessage: msg });
+        };
+
         const highlightRange = (range, highlightClass, highlightId) => { /* same code */
             if (range.collapsed) return;
             const allParagraphs = Array.from(dom.readerContent.querySelectorAll('p'));
@@ -3011,6 +3237,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         dom.tocBtn.addEventListener('click', () => toggleTOC(true));
         if (dom.readerCommentBtn) dom.readerCommentBtn.addEventListener('click', manualCommentOnCurrentChapter);
         if (dom.notesBtn) dom.notesBtn.addEventListener('click', showNotesModal);
+        if (dom.readerBubbleClose) dom.readerBubbleClose.addEventListener('click', () => dom.readerBubble.classList.remove('show'));
         if (dom.notesFilter) dom.notesFilter.addEventListener('change', renderNotesList);
         if (dom.closeNotesBtn) dom.closeNotesBtn.addEventListener('click', hideNotesModal);
         if (dom.notesModal) dom.notesModal.addEventListener('click', (e) => { if (e.target === dom.notesModal) hideNotesModal(); });
@@ -3052,6 +3279,9 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             hideSelectionMenu();
             window.getSelection().removeAllRanges();
         });
+        dom.menuRoleAction.addEventListener('click', () => askCharacterAboutSelection('roleAction'));
+        dom.menuExplain.addEventListener('click', () => askCharacterAboutSelection('explain'));
+        dom.menuWhatNext.addEventListener('click', () => askCharacterAboutSelection('whatNext'));
         dom.saveCommentBtn.addEventListener('click', saveUserComment);
         dom.cancelCommentBtn.addEventListener('click', hideUserCommentModal);
         dom.userCommentModal.addEventListener('click', (e) => { if (e.target === dom.userCommentModal) { hideUserCommentModal(); } });
