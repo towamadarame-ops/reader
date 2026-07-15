@@ -840,6 +840,14 @@
                         </div>
                     </div>
                     <div class="settings-group">
+                        <h3>安装到桌面</h3>
+                        <div class="form-item">
+                            <label>把「陪伴阅读」添加为手机 App，全屏无地址栏使用</label>
+                            <button id="install-app-btn" class="inline-btn action-btn">添加到桌面 / 安装 App</button>
+                        </div>
+                        <p style="font-size:12px;color:var(--secondary-text-color);margin:6px 0 0;">安卓 / 桌面 Chrome 可一键安装；iPhone 需在 Safari 中通过「分享 → 添加到主屏幕」，点按钮会有图文引导。</p>
+                    </div>
+                    <div class="settings-group">
                         <h3>数据管理</h3>
                         <div class="form-item">
                             <label>数据备份与恢复</label>
@@ -992,7 +1000,43 @@
     <script>
     // 动态生成 Manifest 和 Icon
     (function() {
-        const bookIconBase64 = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%23a3ccc4' d='M464 64H48C21.49 64 0 85.49 0 112v336c0 26.51 21.49 48 48 48h416c26.51 0 48-21.49 48-48V112c0-26.51-21.49-48-48-48zm-16 384H64V128h384v320z'/%3E%3Cpath fill='%23ffffff' d='M112 160h288v32H112zm0 64h288v32H112zm0 64h224v32H112z'/%3E%3C/svg%3E";
+        // 用 canvas 生成 PNG 图标：iOS 的 apple-touch-icon 不支持 SVG，必须是不透明位图，否则图标会变成网页截图
+        const roundRect = (ctx, x, y, w, h, r) => {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y, x + w, y + h, r);
+            ctx.arcTo(x + w, y + h, x, y + h, r);
+            ctx.arcTo(x, y + h, x, y, r);
+            ctx.arcTo(x, y, x + w, y, r);
+            ctx.closePath();
+        };
+        const makeIcon = (size) => {
+            const c = document.createElement('canvas');
+            c.width = c.height = size;
+            const ctx = c.getContext('2d');
+            // 不透明背景
+            ctx.fillStyle = '#e0eee8';
+            ctx.fillRect(0, 0, size, size);
+            // 书本主体
+            const m = size * 0.20;
+            ctx.fillStyle = '#a3ccc4';
+            roundRect(ctx, m, m, size - 2 * m, size - 2 * m, size * 0.06);
+            ctx.fill();
+            // 书页线条
+            ctx.fillStyle = '#ffffff';
+            const lx = m + size * 0.10;
+            const lw = size - 2 * m - size * 0.20;
+            const lh = size * 0.05;
+            const gap = size * 0.12;
+            const ly = size * 0.34;
+            for (let i = 0; i < 3; i++) {
+                ctx.fillRect(lx, ly + i * gap, i === 2 ? lw * 0.65 : lw, lh);
+            }
+            return c.toDataURL('image/png');
+        };
+        const icon180 = makeIcon(180);
+        const icon192 = makeIcon(192);
+        const icon512 = makeIcon(512);
         
         const manifest = {
             "name": "陪伴阅读",
@@ -1002,8 +1046,9 @@
             "background_color": "#e0eee8",
             "theme_color": "#e0eee8",
             "icons": [
-                { "src": bookIconBase64, "sizes": "192x192", "type": "image/svg+xml" },
-                { "src": bookIconBase64, "sizes": "512x512", "type": "image/svg+xml" }
+                { "src": icon192, "sizes": "192x192", "type": "image/png", "purpose": "any" },
+                { "src": icon512, "sizes": "512x512", "type": "image/png", "purpose": "any" },
+                { "src": icon512, "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
             ]
         };
         
@@ -1011,8 +1056,8 @@
         const blob = new Blob([stringManifest], {type: 'application/json'});
         const manifestURL = URL.createObjectURL(blob);
         document.getElementById('app-manifest').setAttribute('href', manifestURL);
-        document.getElementById('app-icon').setAttribute('href', bookIconBase64);
-        document.getElementById('app-icon-ios').setAttribute('href', bookIconBase64);
+        document.getElementById('app-icon').setAttribute('href', icon192);
+        document.getElementById('app-icon-ios').setAttribute('href', icon180);
     })();
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -4004,12 +4049,81 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             installBtn.style.display = 'none';
         });
 
-        // 3) iOS Safari 不支持自动安装提示，给出「添加到主屏幕」的一次性引导
+        /* ===== 环境检测 ===== */
+        const ua = window.navigator.userAgent || '';
+        const isIOS = /iphone|ipad|ipod/i.test(ua) ||
+            (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1); // iPadOS 会伪装成 Mac
+        const isSafari = /safari/i.test(ua) && !/crios|fxios|edgios|chrome|android/i.test(ua);
+        // 微信 / QQ / 微博 / 钉钉 / UC / 夸克 / 百度 等内置浏览器，无法「添加到主屏幕」
+        const isInApp = /MicroMessenger|\bQQ\/|QQBrowser|MQQBrowser|Weibo|WeiBo|DingTalk|baiduboxapp|UCBrowser|Quark|Huawei|HeyTap/i.test(ua);
+
+        /* ===== 图文引导弹窗 ===== */
+        const shareIconSvg = '<svg viewBox="0 0 24 24" style="width:16px;height:16px;vertical-align:-3px;fill:#007aff;"><path d="M12 2l3.6 3.6-1.4 1.4L13 5.4V15h-2V5.4L9.8 7 8.4 5.6 12 2zM6 10h2v2H6v8h12v-8h-2v-2h2a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2v-8a2 2 0 012-2z"/></svg>';
+
+        const showGuideModal = (title, bodyHTML) => {
+            const old = document.getElementById('pwa-guide-overlay');
+            if (old) old.remove();
+            const overlay = document.createElement('div');
+            overlay.id = 'pwa-guide-overlay';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;padding:24px;';
+            const card = document.createElement('div');
+            card.style.cssText = 'background:#fff;border-radius:16px;max-width:360px;width:100%;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,0.3);font-family:inherit;color:#333;';
+            card.innerHTML = '<h3 style="margin:0 0 12px;font-size:17px;">' + title + '</h3>' +
+                '<div style="font-size:14px;line-height:1.75;color:#555;">' + bodyHTML + '</div>';
+            const okBtn = document.createElement('button');
+            okBtn.textContent = '我知道了';
+            okBtn.style.cssText = 'margin-top:18px;width:100%;padding:11px;border:none;border-radius:10px;background:#a3ccc4;color:#fff;font-size:15px;cursor:pointer;font-family:inherit;';
+            okBtn.addEventListener('click', () => overlay.remove());
+            card.appendChild(okBtn);
+            overlay.appendChild(card);
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+            document.body.appendChild(overlay);
+        };
+
+        const iosGuideBody =
+            '在 iPhone / iPad 上需要用 <b>Safari 浏览器</b> 手动添加：<br><br>' +
+            '① 确认当前是用 <b>Safari</b> 打开的（微信、QQ 等内置浏览器无法安装）；<br>' +
+            '② 点击屏幕底部（或右上角）的 <b>分享</b> 按钮 ' + shareIconSvg + '；<br>' +
+            '③ 在菜单里向下滑动，找到并点击 <b>「添加到主屏幕」</b>；<br>' +
+            '④ 右上角点 <b>「添加」</b>，桌面就会出现 App 图标，点开即全屏使用。';
+
+        const inAppGuideBody =
+            '你正在<b>微信 / QQ 等应用的内置浏览器</b>中浏览，这里无法安装到桌面。<br><br>' +
+            '请点击右上角的 <b>「···」</b> 菜单，选择 <b>「在浏览器打开」</b>' +
+            (isIOS ? '（iPhone 请选择用 <b>Safari</b> 打开）' : '') +
+            '，然后再点一次「添加到桌面」。';
+
+        const androidGuideBody =
+            '请点击浏览器右上角的菜单，选择 <b>「安装应用」</b> 或 <b>「添加到主屏幕」</b> 即可。<br><br>' +
+            '若菜单里没有该选项，可能是浏览器不支持，建议换用 <b>Chrome</b> 打开本页面。';
+
+        // 统一的安装入口：设置里的按钮 / 悬浮按钮都走这里
+        const requestInstall = () => {
+            if (isStandalone()) {
+                showGuideModal('已经安装啦', '你现在已经是以独立 App 的方式在使用啦，无需重复安装～');
+                return;
+            }
+            // 安卓 / 桌面 Chrome：有原生安装提示时直接调起
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                Promise.resolve(deferredPrompt.userChoice).catch(() => {}).then(() => {
+                    deferredPrompt = null;
+                    installBtn.style.display = 'none';
+                });
+                return;
+            }
+            if (isInApp) { showGuideModal('请在系统浏览器中打开', inAppGuideBody); return; }
+            if (isIOS) { showGuideModal('在 iPhone 上添加到桌面', iosGuideBody); return; }
+            showGuideModal('添加到桌面', androidGuideBody);
+        };
+
+        // 设置里的「添加到桌面」按钮
+        const settingsInstallBtn = document.getElementById('install-app-btn');
+        if (settingsInstallBtn) settingsInstallBtn.addEventListener('click', requestInstall);
+
+        // 3) iOS Safari 不支持自动安装提示，给出「添加到主屏幕」的一次性底部引导（点一下可看详细步骤）
         (function iosHint() {
             if (isStandalone()) return;
-            const ua = window.navigator.userAgent || '';
-            const isIOS = /iphone|ipad|ipod/i.test(ua);
-            const isSafari = /safari/i.test(ua) && !/crios|fxios|edgios|chrome/i.test(ua);
             if (!isIOS || !isSafari) return;
             try {
                 if (localStorage.getItem('iosInstallHintDismissed') === '1') return;
@@ -4031,9 +4145,14 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 'font-size:13px',
                 'line-height:1.6',
                 'font-family:inherit',
-                'box-shadow:0 4px 16px rgba(0,0,0,0.3)'
+                'box-shadow:0 4px 16px rgba(0,0,0,0.3)',
+                'cursor:pointer'
             ].join(';');
-            hint.innerHTML = '想把「陪伴阅读」放到桌面？点击底部的「分享」按钮，再选择「添加到主屏幕」即可全屏使用。';
+            hint.innerHTML = '想把「陪伴阅读」放到桌面？点这里查看步骤：用 Safari 的「分享 ' + shareIconSvg + ' → 添加到主屏幕」即可全屏使用。';
+            hint.addEventListener('click', (e) => {
+                if (e.target === closeBtn) return;
+                showGuideModal('在 iPhone 上添加到桌面', iosGuideBody);
+            });
 
             const closeBtn = document.createElement('span');
             closeBtn.textContent = '×';
