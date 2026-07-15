@@ -173,6 +173,20 @@
         #reader-bubble .rb-dismiss { background-color: #eee; color: #666; }
         #reader-bubble .rb-close { position: absolute; top: 6px; right: 10px; font-size: 18px; line-height: 1; color: #bbb; cursor: pointer; }
 
+        /* 语音朗读：当前朗读段落高亮 + 浮动控件 */
+        .tts-reading { background-color: rgba(163, 204, 196, 0.28); border-radius: 4px; box-shadow: 0 0 0 2px rgba(163,204,196,0.35); transition: background-color 0.2s; }
+        #tts-control {
+            position: absolute; right: 14px; bottom: 74px; z-index: 65;
+            display: none; align-items: center; gap: 6px;
+            background: rgba(0,0,0,0.78); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+            border-radius: 26px; padding: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+        }
+        #tts-control.show { display: inline-flex; }
+        #tts-control button { background: none; border: none; cursor: pointer; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; padding: 0; }
+        #tts-control button svg { width: 22px; height: 22px; fill: #fff; }
+        #tts-control button:active { background-color: rgba(255,255,255,0.15); }
+        #tts-control .tts-status { color: #fff; font-size: 12px; padding: 0 8px 0 4px; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
         .comment-icon { position: absolute; right: -25px; bottom: 0; transform: translateY(50%); width: 20px; height: 20px; border-radius: 50%; cursor: pointer; box-shadow: 0 1px 4px var(--shadow-strong); display: flex; align-items: center; justify-content: center; z-index: 5; }
         .reader-content-wrapper.flip-mode .comment-icon { right: -10px; bottom: 2px; }
         
@@ -474,6 +488,7 @@
                          <button class="icon-btn" id="search-btn" title="全文搜索"><svg viewBox="0 0 24 24"><path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z" /></svg></button>
                         <button class="icon-btn" id="summary-btn" title="章节摘要"><svg viewBox="0 0 24 24"><path d="M14 17H16V19H14V17M14 15H16V10H14V15M20 2H4C2.9 2 2 2.9 2 4V20C2 21.1 2.9 22 4 22H20C21.1 22 22 21.1 22 20V4C22 2.9 21.1 2 20 2M12 9H8V5H12V9M20 20H4V4H20V20Z"/></svg></button>
                         <button class="icon-btn" id="notes-btn" title="书籍笔记"><svg viewBox="0 0 24 24"><path d="M17,3H7A2,2 0 0,0 5,5V21L12,18L19,21V5A2,2 0 0,0 17,3M17,18L12,15.82L7,18V5H17V18M8,7H16V9H8V7M8,11H16V13H8V11Z" /></svg></button>
+                        <button class="icon-btn" id="tts-btn" title="朗读本页"><svg viewBox="0 0 24 24"><path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z" /></svg></button>
                         <button class="icon-btn" id="change-book-btn" title="书架"><svg viewBox="0 0 24 24"><path d="M13,3V9H21V3M13,21H21V11H13M3,21H11V15H3M3,13H11V3H3V13Z"/></svg></button>
                     </div>
                 </header>
@@ -490,6 +505,11 @@
                     </div>
                 </div>
                 <div class="toc-overlay" id="toc-overlay"></div>
+                <div id="tts-control">
+                    <span class="tts-status" id="tts-status">朗读中…</span>
+                    <button id="tts-toggle" title="暂停/继续"><svg id="tts-toggle-icon" viewBox="0 0 24 24"><path d="M14,19H18V5H14M6,19H10V5H6V19Z" /></svg></button>
+                    <button id="tts-stop" title="停止"><svg viewBox="0 0 24 24"><path d="M18,18H6V6H18V18Z" /></svg></button>
+                </div>
                 <div class="toc-panel" id="toc-panel">
                     <div class="toc-header">目录</div>
                     <ul class="toc-list" id="toc-list"></ul>
@@ -636,6 +656,44 @@
                             <label for="chapter-end-enabled">章节末小互动（读完一章后发起一个小问题）</label>
                             <input type="checkbox" id="chapter-end-enabled">
                         </div>
+                    </div>
+                    <div class="settings-group">
+                        <h3>语音朗读 (TTS)</h3>
+                        <p style="font-size:12px;color:var(--secondary-text-color);margin:0 0 8px;">接入 MiniMax 语音合成，让伴侣为你朗读。若浏览器直连被跨域(CORS)拦截，可把"接口地址"改成你自己的代理地址。</p>
+                        <div class="form-item"><label for="tts-api-url">接口地址</label><input type="text" id="tts-api-url" placeholder="https://api.minimaxi.com/v1/t2a_v2"></div>
+                        <div class="form-item"><label for="tts-group-id">Group ID（可选，部分账号需要）</label><input type="text" id="tts-group-id" placeholder="留空则不附加"></div>
+                        <div class="form-item"><label for="tts-api-key">API Key</label><input type="password" id="tts-api-key" placeholder="MiniMax API Key"></div>
+                        <div class="form-item"><label for="tts-voice-id">音色 voice_id</label><input type="text" id="tts-voice-id" placeholder="male-qn-qingse"></div>
+                        <div class="form-item">
+                            <label for="tts-model">模型</label>
+                            <select id="tts-model">
+                                <option value="speech-02-turbo">speech-02-turbo（快/省）</option>
+                                <option value="speech-02-hd">speech-02-hd（音质更好）</option>
+                                <option value="speech-2.6-turbo">speech-2.6-turbo</option>
+                                <option value="speech-2.6-hd">speech-2.6-hd</option>
+                                <option value="speech-2.8-turbo">speech-2.8-turbo</option>
+                                <option value="speech-2.8-hd">speech-2.8-hd</option>
+                                <option value="speech-01-turbo">speech-01-turbo</option>
+                                <option value="speech-01-hd">speech-01-hd</option>
+                            </select>
+                        </div>
+                        <div class="form-item">
+                            <label>语速</label>
+                            <div class="range-control">
+                                <input type="range" id="tts-speed" min="0.5" max="2" step="0.1">
+                                <span id="tts-speed-value">1</span>
+                            </div>
+                        </div>
+                        <div class="form-item">
+                            <label for="tts-emotion-enabled">AI 情绪配音（由 AI 为文本分段指定自然情绪，语气更生动）</label>
+                            <input type="checkbox" id="tts-emotion-enabled">
+                        </div>
+                        <div class="form-item">
+                            <label for="tts-use-proxy">启用 CORS 反代（浏览器直连被跨域拦截时打开）</label>
+                            <input type="checkbox" id="tts-use-proxy">
+                        </div>
+                        <div class="form-item"><label for="tts-proxy-url">反代地址（你部署的 Cloudflare Worker 网址）</label><input type="text" id="tts-proxy-url" placeholder="https://xxx.workers.dev"></div>
+                        <p style="font-size:12px;color:var(--secondary-text-color);margin:4px 0 0;">反代部署方法见随附的 minimax-proxy-worker.js 文件内的说明。</p>
                     </div>
                     <div class="settings-group">
                         <h3>主题定制</h3>
@@ -872,6 +930,12 @@
             readerBubbleName: document.getElementById('reader-bubble-name'),
             readerBubbleText: document.getElementById('reader-bubble-text'),
             readerBubbleActions: document.getElementById('reader-bubble-actions'),
+            ttsBtn: document.getElementById('tts-btn'),
+            ttsControl: document.getElementById('tts-control'),
+            ttsStatus: document.getElementById('tts-status'),
+            ttsToggle: document.getElementById('tts-toggle'),
+            ttsToggleIcon: document.getElementById('tts-toggle-icon'),
+            ttsStop: document.getElementById('tts-stop'),
             bookTitle: document.getElementById('book-title'),
             changeBookBtn: document.getElementById('change-book-btn'),
             summaryBtn: document.getElementById('summary-btn'),
@@ -922,6 +986,16 @@
             careMinutes: document.getElementById('care-minutes'),
             moodEnabled: document.getElementById('mood-enabled'),
             chapterEndEnabled: document.getElementById('chapter-end-enabled'),
+            ttsApiUrl: document.getElementById('tts-api-url'),
+            ttsGroupId: document.getElementById('tts-group-id'),
+            ttsApiKey: document.getElementById('tts-api-key'),
+            ttsVoiceId: document.getElementById('tts-voice-id'),
+            ttsModel: document.getElementById('tts-model'),
+            ttsSpeed: document.getElementById('tts-speed'),
+            ttsSpeedValue: document.getElementById('tts-speed-value'),
+            ttsEmotionEnabled: document.getElementById('tts-emotion-enabled'),
+            ttsUseProxy: document.getElementById('tts-use-proxy'),
+            ttsProxyUrl: document.getElementById('tts-proxy-url'),
             chatBgInput: document.getElementById('chat-bg-input'),
             aiAvatarSetting: document.getElementById('ai-avatar-setting'), userAvatarSetting: document.getElementById('user-avatar-setting'),
             bookFileInput: document.getElementById('book-file-input'),
@@ -1015,6 +1089,17 @@
                     careMinutes: 30,          // 连续阅读多少分钟提醒一次
                     moodEnabled: true,        // 共读心情（进入新章节时分享情绪）
                     chapterEndEnabled: true,  // 读完一章的小互动提问
+                },
+                tts: {
+                    apiUrl: 'https://api.minimaxi.com/v1/t2a_v2', // 可改为自己的代理地址
+                    groupId: '',              // 部分账号需要，作为 URL 参数附加；留空则不加
+                    apiKey: '',
+                    voiceId: 'male-qn-qingse',
+                    model: 'speech-02-turbo',
+                    speed: 1,
+                    useProxy: false,          // 遇到 CORS 时打开，走下面的反代地址
+                    proxyUrl: '',             // 你部署的 Cloudflare Worker 地址
+                    emotionEnabled: false,    // AI 情绪配音：让 LLM 为文本分段指定情绪
                 },
                 chatBgImage: 'none',
                 theme: {
@@ -1170,6 +1255,7 @@
                 dom.readerProgressContainer.style.display = 'none';
                 if (dom.readerBubble) dom.readerBubble.classList.remove('show');
                 if (typeof stopReadCareTimer === 'function') stopReadCareTimer();
+                if (typeof stopTts === 'function') stopTts();
             } else {
                 dom.readerProgressContainer.style.display = 'block';
                 if (typeof startReadCareTimer === 'function' && getActiveBook()) startReadCareTimer();
@@ -1310,6 +1396,17 @@
                     careMinutes: Math.max(1, parseInt(dom.careMinutes.value, 10) || 30),
                     moodEnabled: dom.moodEnabled.checked,
                     chapterEndEnabled: dom.chapterEndEnabled.checked,
+                };
+                state.settings.tts = {
+                    apiUrl: (dom.ttsApiUrl.value || '').trim() || 'https://api.minimaxi.com/v1/t2a_v2',
+                    groupId: (dom.ttsGroupId.value || '').trim(),
+                    apiKey: (dom.ttsApiKey.value || '').trim(),
+                    voiceId: (dom.ttsVoiceId.value || '').trim() || 'male-qn-qingse',
+                    model: dom.ttsModel.value,
+                    speed: parseFloat(dom.ttsSpeed.value) || 1,
+                    useProxy: dom.ttsUseProxy.checked,
+                    proxyUrl: (dom.ttsProxyUrl.value || '').trim(),
+                    emotionEnabled: dom.ttsEmotionEnabled.checked,
                 };
                 state.settings.theme.readerBg = dom.readerBgColor.value;
                 state.settings.theme.readerFontColor = dom.readerFontColor.value;
@@ -1490,6 +1587,7 @@
                     mergedSettings.rp = { ...state.settings.rp, ...(parsed.rp || {}) };
                     mergedSettings.memory = { ...state.settings.memory, ...(parsed.memory || {}) };
                     mergedSettings.companion = { ...state.settings.companion, ...(parsed.companion || {}) };
+                    mergedSettings.tts = { ...state.settings.tts, ...(parsed.tts || {}) };
                     if (!Array.isArray(mergedSettings.worldBook)) mergedSettings.worldBook = [];
                     state.settings = mergedSettings;
                 }
@@ -1533,6 +1631,17 @@
             dom.careMinutes.value = comp.careMinutes || 30;
             dom.moodEnabled.checked = comp.moodEnabled !== false;
             dom.chapterEndEnabled.checked = comp.chapterEndEnabled !== false;
+            const tts = state.settings.tts || {};
+            dom.ttsApiUrl.value = tts.apiUrl || 'https://api.minimaxi.com/v1/t2a_v2';
+            dom.ttsGroupId.value = tts.groupId || '';
+            dom.ttsApiKey.value = tts.apiKey || '';
+            dom.ttsVoiceId.value = tts.voiceId || 'male-qn-qingse';
+            dom.ttsModel.value = tts.model || 'speech-02-turbo';
+            dom.ttsSpeed.value = tts.speed || 1;
+            dom.ttsSpeedValue.textContent = tts.speed || 1;
+            dom.ttsEmotionEnabled.checked = tts.emotionEnabled === true;
+            dom.ttsUseProxy.checked = tts.useProxy === true;
+            dom.ttsProxyUrl.value = tts.proxyUrl || '';
             
             document.querySelectorAll('.avatar[data-sender="ai"]').forEach(el => el.src = state.settings.aiAvatar);
             document.querySelectorAll('.avatar[data-sender="user"]').forEach(el => el.src = state.settings.userAvatar);
@@ -1748,7 +1857,7 @@
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                    body: JSON.stringify({ model: apiModel, messages: messages, stream: false })
+                    body: JSON.stringify({ model: apiModel, messages: messages, stream: false, temperature: apiType === 'chat' ? 0.95 : 0.6, top_p: apiType === 'chat' ? 0.95 : 0.8 })
                 });
                 if (!response.ok) {
                     let errorMessage = `API请求失败: HTTP ${response.status} ${response.statusText}`;
@@ -1819,9 +1928,9 @@
             const charName = s.aiName || '伴侣';
             const userName = s.userName || '我';
             const lengthMap = {
-                short: '一次通常只说一句到两句短句，像发微信那样简短随意，绝不长篇大论。',
-                medium: '以短句为主，一般两三句就好，偶尔情绪浓时才多说一点；不要每次都长篇大论。',
-                long: '可以说得多一些、更细腻，但仍要口语化、有节奏，不要变成大段独白或说明文。'
+                short: '长短随心，多数时候很短——有时只是一两个字、一个语气词、一句半句；偶尔才两三句。别每条都一样长。',
+                medium: '长短随意，通常一两句，兴致来了偶尔多聊几句，也可能只蹦一个词或一句感叹；不要每条都一样长。',
+                long: '可以聊得开一些，但要有长有短、有节奏；有时一大段，有时就一句，别每次都工工整整一整段。'
             };
             const lengthGuide = lengthOverride || lengthMap[rp.replyLength] || lengthMap.short;
 
@@ -1870,10 +1979,12 @@
 
 
             const guide = [];
-            guide.push(`- 【最重要】像真人日常聊天：真人不会每次都长篇大论，绝大多数时候只说一两句短短的日常话。${lengthGuide}宁可短、别啰嗦。`);
+            guide.push(`- 【最重要·长短随机】真人说话有时多有时少，绝不是每句都一样长。${lengthGuide}该短就短（甚至只回一个词、一个"嗯……"、一句感叹），偶尔才多说几句，让长短自然波动、别整齐划一。`);
             guide.push('- 严格贴合人设：语气、用词、性格、口头禅都要像「你的角色」本人，让每句话都有 TA 的味道，而不是千篇一律的通用腔调。');
-            guide.push('- 句式多变：不要每次都用相同的开头和结构（比如老是"其实……""我觉得……"），像真人一样有随意、有变化。');
-            guide.push('- 坚决不说教、不总结、不升华：不要讲大道理、不要分析式点评、不要在结尾拔高主题；有情绪、有态度就够了。');
+            guide.push('- 【思维发散】像真人闲聊那样天马行空：读书时人的思绪是散的，可以从书里的情节突然联想到自己的经历、心情、生活琐事、别的书或别的事，也可以顺嘴岔到完全无关的话题。不必句句都围着书和书里的人物打转，漫无目的的闲扯才真实。');
+            guide.push('- 【表达多样】不要总是平铺直叙地陈述。可以反问、自言自语、突然发问、若有所思、半句没说完、纯粹的情绪流露（惊叹/吐槽/沉默似的"…"）、开玩笑、走神，像真人一样有各种即兴反应。');
+            guide.push('- 句式多变：别每次都用相同的开头和结构（比如老是"其实……""我觉得……"），换着花样说。');
+            guide.push('- 坚决不说教、不总结、不升华：不讲大道理、不做分析式点评、不在结尾拔高主题；有情绪、有态度、有联想就够了。');
             guide.push('- 坚决拒绝 AI 腔：绝不出现"作为 AI""我只是个程序""我可以帮您""有什么可以帮您的吗""总的来说"等客服式、说明书式表达；不要滥用条列和分点。');
             guide.push(`- 只演你自己：绝不替「${userName}」说话、行动或替 TA 决定想法感受；把选择权留给对方。`);
             if (rp.immersive !== false) {
@@ -1882,7 +1993,7 @@
                 guide.push('- 以自然的口语对话为主，不做旁白式描写。');
             }
             if (rp.proactive !== false) {
-                guide.push('- 有来有回：可以主动开个话头、追一句、调侃或反问，但同样保持简短，像真实聊天那样一来一往，而不是一次性倒一大段。');
+                guide.push('- 有来有回：可以主动开个话头、追一句、调侃或反问，像真实聊天那样一来一往，而不是一次性倒一大段。');
             }
             guide.push('- 有真实的内心：有自己的喜好、态度和小情绪，可以调侃、反驳、卖关子，不必事事迎合。');
             guide.push('- 情绪连贯：记得此前的氛围与心情，自然过渡，不要每句都热情满格或突然变脸。');
@@ -1891,6 +2002,22 @@
 
             const now = new Date();
             parts.push(`【补充】若用户消息以 '__PAT_' 开头，代表 TA 在"拍一拍"你（一个亲密的小动作），请以角色身份自然、有情绪地回应。当前时间：${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日${now.getHours()}点。`);
+
+            // 每次随机注入一条"即兴倾向"，制造真人般不可预测的变化（约一半概率保持自然发挥）
+            const flavors = [
+                '这次就懒懒地回一两个字或一句短短的话，别多说。',
+                '这次可以主动把话题岔开——聊到你自己的事、刚想起的东西，或者别的什么，不必一直围着当前内容。',
+                '这次先走个神/愣一下，再随口接话。',
+                '这次带点鲜明的情绪（吐槽、感叹、调侃、撒娇或小情绪都行）。',
+                '这次以反问或突然发问来回应，把话头抛回给对方。',
+                '这次只用一个词、一个语气词或一个表情般的短促反应。',
+                '这次难得多说几句，但依旧口语、跳跃、不工整。',
+                '这次可以答非所问一点点，或者顺着自己的思路飘一下。',
+            ];
+            if (Math.random() < 0.55) {
+                const pick = flavors[Math.floor(Math.random() * flavors.length)];
+                parts.push(`【本次即兴倾向（仅这一次的小提示，自然融入即可，别生硬照做，也别在文字里提到这条提示）】\n${pick}`);
+            }
 
             return parts.join('\n\n');
         };
@@ -2254,7 +2381,7 @@
 本章梗概: ${chapterSummary}
 这一处前后的原文: "...${contextSnippet}..."
 ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
-请结合已读剧情和人物关系，以你的角色身份，像在书页边随手写下的批注那样，简短说一两句你此刻的真实反应——可以是对人物处境的心疼/吐槽、对情节的猜测或共鸣。要显得你真的读懂了故事，但别复述原文、别做分析讲解、别说教。
+以你的角色身份，像在书页边随手写下的批注、脱口而出的一句话那样，给出此刻你最真实的反应。它可以是对人物的心疼或吐槽、对情节的猜测或共鸣；但也完全可以像真人读书走神那样——突然联想到你自己的经历、心情、别的事，或者顺口岔到别处；可以是一句感叹、一个反问、若有所思，甚至只是"…"。别复述原文、别分析讲解、别说教。
             `.trim();
 
             // 使用角色扮演 system prompt，并把阅读相关文本纳入世界书扫描范围
@@ -2263,8 +2390,8 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 role: 'system',
                 content: buildRoleplaySystemContent({
                     scanText,
-                    sceneExtra: `${state.settings.userName || '我'}正读到一句话，你想像写书页批注一样简短地聊两句。`,
-                    lengthOverride: '务必简短，最多两三句短句，像真实读书时随手写的批注或脱口而出的感慨。绝不长篇大论、不复述原文、不分析讲解、不说教。'
+                    sceneExtra: `${state.settings.userName || '我'}正读到一句话，你像在书页边随手批注一样，即兴反应一下。`,
+                    lengthOverride: '长短随机、别每条都一样：大多数时候很短（一个词、一句感叹或一句话），偶尔才两三句。像真实读书时的随手批注，绝不长篇大论、不复述原文、不分析讲解、不说教。'
                 })
             };
             const messages = [systemPrompt, ...recentHistory, { role: 'user', content: contextMessage }];
@@ -2474,6 +2601,190 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 (reply) => { state.reading.companionBusy = false; showReaderBubble(reply, { reply: true, replyLabel: '聊聊', duration: 18000 }); }
             );
             setTimeout(() => { state.reading.companionBusy = false; }, 20000);
+        };
+
+        // ===== 语音朗读 (MiniMax TTS) =====
+        const ttsPlayer = { active: false, paused: false, queue: [], pos: 0, audio: null, curPara: null };
+
+        const ttsUpdateUI = () => {
+            if (!dom.ttsControl) return;
+            if (ttsPlayer.active) {
+                dom.ttsControl.classList.add('show');
+                dom.ttsToggleIcon.innerHTML = ttsPlayer.paused
+                    ? '<path d="M8,5.14V19.14L19,12.14L8,5.14Z" />'   // play
+                    : '<path d="M14,19H18V5H14M6,19H10V5H6V19Z" />';    // pause
+                dom.ttsStatus.textContent = ttsPlayer.paused ? '已暂停' : `朗读中 ${ttsPlayer.pos + 1}/${ttsPlayer.queue.length}`;
+            } else {
+                dom.ttsControl.classList.remove('show');
+            }
+        };
+
+        const ttsSetReadingHighlight = (pEl) => {
+            if (ttsPlayer.curPara && ttsPlayer.curPara !== pEl) ttsPlayer.curPara.classList.remove('tts-reading');
+            ttsPlayer.curPara = pEl || null;
+            if (pEl) {
+                pEl.classList.add('tts-reading');
+                try { pEl.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' }); } catch (e) {}
+            }
+        };
+
+        // 把长段落按句子切成较小的块，避免单次请求过大
+        const ttsSplitChunks = (text, max = 600) => {
+            if (text.length <= max) return [text];
+            const sentences = text.match(/[^。！？!?\n]+[。！？!?]?/g) || [text];
+            const chunks = []; let cur = '';
+            for (const s of sentences) {
+                if ((cur + s).length > max && cur) { chunks.push(cur); cur = s; }
+                else cur += s;
+            }
+            if (cur.trim()) chunks.push(cur);
+            return chunks;
+        };
+
+        // 调用 MiniMax T2A，返回可播放的音频 URL（hex 解码为 mp3 Blob）
+        const TTS_EMOTIONS = ['happy', 'sad', 'angry', 'fearful', 'disgusted', 'surprised', 'neutral'];
+        const ttsSynthesize = async (text, emotion) => {
+            const cfg = state.settings.tts || {};
+            if (!cfg.apiKey) throw new Error('请先在设置中填写 TTS 的 API Key');
+            let target = (cfg.apiUrl || 'https://api.minimaxi.com/v1/t2a_v2').trim();
+            if (cfg.groupId) target += (target.includes('?') ? '&' : '?') + 'GroupId=' + encodeURIComponent(cfg.groupId);
+            // 若开启 CORS 反代，则把真实地址作为 ?url= 传给你的 Worker
+            let endpoint = target;
+            if (cfg.useProxy && cfg.proxyUrl) {
+                const base = cfg.proxyUrl.trim();
+                endpoint = base + (base.includes('?') ? '&' : '?') + 'url=' + encodeURIComponent(target);
+            }
+            const voiceSetting = { voice_id: cfg.voiceId || 'male-qn-qingse', speed: parseFloat(cfg.speed) || 1, vol: 1, pitch: 0 };
+            if (emotion && TTS_EMOTIONS.includes(emotion)) voiceSetting.emotion = emotion;
+            const body = {
+                model: cfg.model || 'speech-02-turbo',
+                text,
+                stream: false,
+                voice_setting: voiceSetting,
+                audio_setting: { sample_rate: 32000, bitrate: 128000, format: 'mp3', channel: 1 },
+            };
+            const resp = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+                body: JSON.stringify(body),
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+            const data = await resp.json();
+            if (data.base_resp && data.base_resp.status_code !== 0) throw new Error(data.base_resp.status_msg || '合成失败');
+            const hex = data.data && data.data.audio;
+            if (!hex) throw new Error('返回中没有音频数据');
+            const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(h => parseInt(h, 16)));
+            return URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
+        };
+
+        // 让 LLM 把一段文字切成带情绪标签的小片段，实现同一段内的语气转折
+        const ttsAnalyzeEmotions = async (text) => {
+            const sys = `你是配音导演。请把用户给的文本切成若干连续片段，为每段标注最贴合的情绪，让朗读有自然的语气起伏。情绪只能从这些里选：${TTS_EMOTIONS.join('、')}。只输出 JSON 数组，形如 [{"text":"...","emotion":"happy"}]，片段拼接后必须与原文完全一致（含标点），不要增删改字，不要输出任何多余说明。`;
+            const { content, error } = await callAIApi([
+                { role: 'system', content: sys },
+                { role: 'user', content: text }
+            ], 'summary');
+            if (error || !content) return null;
+            try {
+                let s = content.trim().replace(/^```(json)?/i, '').replace(/```$/,'').trim();
+                const arr = JSON.parse(s);
+                if (!Array.isArray(arr) || !arr.length) return null;
+                const segs = arr
+                    .map(o => ({ text: (o && o.text ? String(o.text) : ''), emotion: TTS_EMOTIONS.includes(o && o.emotion) ? o.emotion : 'neutral' }))
+                    .filter(o => o.text.trim());
+                return segs.length ? segs : null;
+            } catch (e) { return null; }
+        };
+
+        const ttsPlayAt = async (i) => {
+            if (!ttsPlayer.active) return;
+            if (i >= ttsPlayer.queue.length) { addSystemMessage('这一段读完啦～', true); stopTts(); return; }
+            ttsPlayer.pos = i;
+            let item = ttsPlayer.queue[i];
+
+            // AI 情绪配音：懒处理——到达某段时，先让 LLM 把它切成带情绪的小片段，就地展开
+            const emoOn = (state.settings.tts || {}).emotionEnabled === true;
+            if (emoOn && !item.emotionDone && !item.emotion) {
+                ttsSetReadingHighlight(item.p);
+                if (dom.ttsStatus) dom.ttsStatus.textContent = '正在分析情绪…';
+                let segs = null;
+                try { segs = await ttsAnalyzeEmotions(item.text); } catch (e) { segs = null; }
+                if (!ttsPlayer.active) return;
+                if (segs && segs.length) {
+                    const expanded = segs.map(s => ({ p: item.p, text: s.text, emotion: s.emotion, emotionDone: true }));
+                    ttsPlayer.queue.splice(i, 1, ...expanded);
+                } else {
+                    item.emotionDone = true;
+                }
+                item = ttsPlayer.queue[i];
+            }
+
+            ttsSetReadingHighlight(item.p);
+            ttsUpdateUI();
+            let src = item._url;
+            if (!src) {
+                try { src = await ttsSynthesize(item.text, item.emotion); }
+                catch (e) { addSystemMessage('朗读失败：' + e.message + '（若是跨域/CORS 问题，请在设置里打开「启用 CORS 反代」并填入你的 Worker 地址）'); stopTts(); return; }
+            }
+            if (!ttsPlayer.active) { URL.revokeObjectURL(src); return; }
+            // 预取下一段（仅在未开启情绪配音时；情绪模式下段落会动态展开，不预取）
+            if (!emoOn) {
+                const next = ttsPlayer.queue[i + 1];
+                if (next && !next._url) { ttsSynthesize(next.text, next.emotion).then(u => { next._url = u; }).catch(() => {}); }
+            }
+            const audio = ttsPlayer.audio;
+            audio.src = src;
+            audio.onended = () => { URL.revokeObjectURL(src); if (ttsPlayer.active && !ttsPlayer.paused) ttsPlayAt(i + 1); };
+            audio.onerror = () => { if (ttsPlayer.active && !ttsPlayer.paused) ttsPlayAt(i + 1); };
+            try { await audio.play(); } catch (e) { ttsPlayer.paused = true; ttsUpdateUI(); /* 被自动播放策略拦截：切到暂停态，用户点播放键即可在手势内启动 */ }
+        };
+
+        const startTts = async () => {
+            if (ttsPlayer.active) return;
+            const book = getActiveBook();
+            if (!book) { addSystemMessage('请先打开一本书'); return; }
+            if (!(state.settings.tts || {}).apiKey) { addSystemMessage('请先在「设置 → 语音朗读」中填写 API Key'); return; }
+            // 从当前可见位置开始，收集其后的段落
+            const allP = Array.from(dom.readerContent.querySelectorAll('p')).filter(p => p.textContent.trim().length > 0);
+            if (!allP.length) { addSystemMessage('当前没有可朗读的内容'); return; }
+            const cRect = dom.readerContentWrapper.getBoundingClientRect();
+            let startIdx = allP.findIndex(p => {
+                const r = p.getBoundingClientRect();
+                return r.bottom > cRect.top + 2 && r.right > cRect.left + 2;
+            });
+            if (startIdx < 0) startIdx = 0;
+            const queue = [];
+            for (let i = startIdx; i < allP.length; i++) {
+                const t = allP[i].textContent.trim();
+                if (t.length < 1) continue;
+                ttsSplitChunks(t).forEach(c => { if (c.trim()) queue.push({ p: allP[i], text: c.trim() }); });
+            }
+            if (!queue.length) { addSystemMessage('当前没有可朗读的内容'); return; }
+            ttsPlayer.active = true;
+            ttsPlayer.paused = false;
+            ttsPlayer.queue = queue;
+            ttsPlayer.pos = 0;
+            ttsPlayer.audio = new Audio(); // 于用户手势中创建，便于移动端解锁播放
+            ttsUpdateUI();
+            ttsPlayAt(0);
+        };
+
+        const pauseResumeTts = () => {
+            if (!ttsPlayer.active || !ttsPlayer.audio) return;
+            if (ttsPlayer.paused) { ttsPlayer.paused = false; ttsPlayer.audio.play().catch(() => {}); }
+            else { ttsPlayer.paused = true; ttsPlayer.audio.pause(); }
+            ttsUpdateUI();
+        };
+
+        const stopTts = () => {
+            ttsPlayer.active = false;
+            ttsPlayer.paused = false;
+            if (ttsPlayer.audio) { try { ttsPlayer.audio.pause(); } catch (e) {} ttsPlayer.audio.onended = null; ttsPlayer.audio.onerror = null; ttsPlayer.audio = null; }
+            // 释放已预取的音频 URL
+            ttsPlayer.queue.forEach(it => { if (it._url) { try { URL.revokeObjectURL(it._url); } catch (e) {} } });
+            ttsPlayer.queue = [];
+            ttsSetReadingHighlight(null);
+            ttsUpdateUI();
         };
 
         // ===== 书籍笔记：汇总所有标注（原文 + 伴侣/我的想法）=====
@@ -3277,6 +3588,10 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         dom.tocBtn.addEventListener('click', () => toggleTOC(true));
         if (dom.readerCommentBtn) dom.readerCommentBtn.addEventListener('click', manualCommentOnCurrentChapter);
         if (dom.notesBtn) dom.notesBtn.addEventListener('click', showNotesModal);
+        if (dom.ttsBtn) dom.ttsBtn.addEventListener('click', startTts);
+        if (dom.ttsToggle) dom.ttsToggle.addEventListener('click', pauseResumeTts);
+        if (dom.ttsStop) dom.ttsStop.addEventListener('click', stopTts);
+        if (dom.ttsSpeed) dom.ttsSpeed.addEventListener('input', () => { dom.ttsSpeedValue.textContent = dom.ttsSpeed.value; });
         if (dom.readerBubbleClose) dom.readerBubbleClose.addEventListener('click', () => dom.readerBubble.classList.remove('show'));
         if (dom.notesFilter) dom.notesFilter.addEventListener('change', renderNotesList);
         if (dom.closeNotesBtn) dom.closeNotesBtn.addEventListener('click', hideNotesModal);
