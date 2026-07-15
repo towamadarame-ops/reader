@@ -473,12 +473,19 @@
             padding: 14px 18px 16px;
             z-index: 95;
             transform: translateY(130%);
-            transition: transform 0.3s ease;
+            visibility: hidden;
+            pointer-events: none;
+            transition: transform 0.3s ease, visibility 0s linear 0.3s;
             display: flex;
             flex-direction: column;
             gap: 12px;
         }
-        .reader-nav-menu.show { transform: translateY(0); }
+        .reader-nav-menu.show {
+            transform: translateY(0);
+            visibility: visible;
+            pointer-events: auto;
+            transition: transform 0.3s ease, visibility 0s;
+        }
         .rnav-chapter-label {
             text-align: center;
             font-size: 13px;
