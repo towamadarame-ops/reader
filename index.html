@@ -64,7 +64,7 @@
         .view.active { transform: translateX(0); z-index: 2; }
 
         .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background-color: #fff; box-shadow: 0 2px 5px var(--shadow-light); z-index: 10; flex-shrink: 0; }
-        .top-bar .title { font-weight: 600; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .top-bar .title { font-weight: 600; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; text-align: center; padding: 0 8px; }
         .top-bar .icon-btn { padding: 5px; background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .top-bar .icon-btn svg { width: 24px; height: 24px; fill: var(--secondary-text-color); }
         .top-bar .right-icons { display: flex; gap: 5px; }
@@ -1443,6 +1443,7 @@
         };
 
         const showStatusBar = () => {
+            if (state.reading.isNavMenuVisible) return; // 导航面板打开时不显示，避免文字重叠
             if (state.reading.isStatusBarVisible) return;
             dom.readerStatusBar.classList.add('show');
             state.reading.isStatusBarVisible = true;
@@ -1523,7 +1524,7 @@
             syncNavMenu();
             dom.readerNavMenu.classList.add('show');
             state.reading.isNavMenuVisible = true;
-            showStatusBar();
+            hideStatusBar(); // 面板已含章节与进度信息，收起底部状态栏避免重叠
         };
 
         const hideReaderNav = () => {
