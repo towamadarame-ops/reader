@@ -557,6 +557,28 @@
             font-size: 13px; cursor: pointer; padding: 4px 10px;
         }
 
+        /* 角色 / 身份 管理弹窗 */
+        #profiles-modal { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; padding: 20px; }
+        #profiles-modal.show { display: flex; }
+        .pf-modal-content { background: #fff; border-radius: 16px; width: 100%; max-width: 420px; max-height: 82vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        .pf-tabs { display: flex; border-bottom: 1px solid #eee; flex-shrink: 0; }
+        .pf-tab { flex: 1; padding: 14px; background: none; border: none; font-size: 15px; font-family: inherit; color: var(--secondary-text-color); cursor: pointer; }
+        .pf-tab.active { color: var(--accent-color); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent-color); }
+        .pf-list { padding: 12px; overflow-y: auto; flex: 1; }
+        .pf-card { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; border: 1px solid #eee; margin-bottom: 10px; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+        .pf-card:hover { background: #fafafa; }
+        .pf-card.active { border-color: var(--accent-color); background: rgba(163,204,196,0.12); }
+        .pf-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: #eee; }
+        .pf-info { flex: 1; min-width: 0; }
+        .pf-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pf-badge { font-size: 11px; color: #fff; background: var(--accent-color); border-radius: 8px; padding: 1px 6px; font-weight: 500; margin-left: 4px; }
+        .pf-sub { font-size: 12px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+        .pf-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .pf-actions button { border: none; background: #f0f0f0; color: #555; font-size: 12px; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-family: inherit; }
+        .pf-actions .pf-del:active, .pf-actions .pf-del:hover { background: #ffdad6; color: #c0392b; }
+        .pf-footer { display: flex; gap: 10px; padding: 12px; border-top: 1px solid #eee; flex-shrink: 0; }
+        .pf-footer button { flex: 1; }
+
         input[type="file"] { display: none; }
     </style>
 </head>
@@ -566,7 +588,7 @@
         <div class="view-container">
             <div id="chat-view" class="view active">
                 <header class="top-bar">
-                    <div style="width: 34px;"></div>
+                    <button class="icon-btn" id="profiles-btn" title="角色 / 身份"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></button>
                     <div class="title" id="chat-title">伴侣</div>
                     <button class="icon-btn" id="settings-btn" title="设置"><svg viewBox="0 0 24 24"><path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L2.34,18.73C2.46,18.95 2.73,19.03 2.95,18.95L5.44,17.94C5.96,18.34 6.5,18.68 7.13,18.93L7.5,21.58C7.54,21.82 7.75,22 8,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" /></svg></button>
                 </header>
@@ -903,6 +925,22 @@
         </div>
         <div class="rnav-toc-entry"><button id="rnav-toc-btn">打开目录</button></div>
     </div>
+
+    <!-- 角色 / 身份 管理弹窗 -->
+    <div id="profiles-modal">
+        <div class="pf-modal-content">
+            <div class="pf-tabs">
+                <button class="pf-tab active" data-tab="char">AI 角色</button>
+                <button class="pf-tab" data-tab="persona">我的身份</button>
+            </div>
+            <div class="pf-list" id="pf-char-list"></div>
+            <div class="pf-list" id="pf-persona-list" style="display:none;"></div>
+            <div class="pf-footer">
+                <button id="pf-add-btn" class="reader-btn">+ 新建</button>
+                <button id="pf-close-btn" class="reader-btn" style="background-color:#aaa;">关闭</button>
+            </div>
+        </div>
+    </div>
     
     <input type="file" id="book-file-input" accept=".txt">
     <input type="file" id="ai-avatar-input" accept="image/*">
@@ -1113,6 +1151,13 @@
             tocList: document.getElementById('toc-list'),
             settingsView: document.getElementById('settings-view'),
             settingsBtn: document.getElementById('settings-btn'),
+            profilesBtn: document.getElementById('profiles-btn'),
+            profilesModal: document.getElementById('profiles-modal'),
+            pfCharList: document.getElementById('pf-char-list'),
+            pfPersonaList: document.getElementById('pf-persona-list'),
+            pfTabs: document.querySelectorAll('.pf-tab'),
+            pfAddBtn: document.getElementById('pf-add-btn'),
+            pfCloseBtn: document.getElementById('pf-close-btn'),
             settingsBackBtn: document.getElementById('settings-back-btn'),
             saveSettingsBtn: document.getElementById('save-settings-btn'),
             apiUrl: document.getElementById('api-url'), apiKey: document.getElementById('api-key'), apiModel: document.getElementById('api-model'),
@@ -1287,6 +1332,8 @@
             summaries: {},
             memories: [],
             memoryMeta: { lastSummarizedTimestamp: 0 },
+            characters: { list: [], activeId: null }, // AI 角色库（每个角色独立聊天与记忆）
+            personas: { list: [], activeId: null },    // 用户身份库
             chat: {
                 history: [],
                 lastMessageTimestamp: 0,
@@ -1670,6 +1717,12 @@
                 state.settings.reading.paginationMode = dom.paginationMode.value;
                 state.settings.reading.autoGenerateSummaries = dom.autoSummaryToggle.checked;
                 
+                // 把当前编辑同步回激活的角色卡 / 身份，并各自持久化
+                syncSettingsToActiveCharacter();
+                syncSettingsToActivePersona();
+                await saveCharacters();
+                await savePersonas();
+
                 await localforage.setItem('readingCompanionSettings', state.settings);
                 applySettings();
                 addSystemMessage('设置已保存');
@@ -1935,6 +1988,240 @@
             updateThemePreview();
         };
 
+        /* ============ 多角色 / 多身份 档案系统 ============ */
+        const genProfileId = (prefix) => `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+        const getActiveCharacter = () => (state.characters.list || []).find(c => c.id === state.characters.activeId) || null;
+        const getActivePersona = () => (state.personas.list || []).find(p => p.id === state.personas.activeId) || null;
+
+        // settings.ai* <-> 当前角色卡
+        const syncSettingsToActiveCharacter = () => {
+            const c = getActiveCharacter(); if (!c) return;
+            c.name = state.settings.aiName;
+            c.prompt = state.settings.aiPrompt;
+            c.avatar = state.settings.aiAvatar;
+            c.bubbleColor = state.settings.aiBubbleColor;
+            c.patSuffixes = state.settings.aiPatSuffixes;
+            c.worldBook = state.settings.worldBook;
+        };
+        const applyCharacterToSettings = (c) => {
+            if (!c) return;
+            state.settings.aiName = c.name || '伴侣';
+            state.settings.aiPrompt = c.prompt || '';
+            if (c.avatar) state.settings.aiAvatar = c.avatar;
+            state.settings.aiBubbleColor = c.bubbleColor || '#ffffff';
+            state.settings.aiPatSuffixes = Array.isArray(c.patSuffixes) ? c.patSuffixes : [];
+            state.settings.worldBook = Array.isArray(c.worldBook) ? c.worldBook : [];
+        };
+        // settings.user* <-> 当前身份
+        const syncSettingsToActivePersona = () => {
+            const p = getActivePersona(); if (!p) return;
+            p.name = state.settings.userName;
+            p.avatar = state.settings.userAvatar;
+            p.bubbleColor = state.settings.userBubbleColor;
+            p.patSuffixes = state.settings.userPatSuffixes;
+            p.persona = state.settings.userPersona;
+        };
+        const applyPersonaToSettings = (p) => {
+            if (!p) return;
+            state.settings.userName = p.name || '我';
+            if (p.avatar) state.settings.userAvatar = p.avatar;
+            state.settings.userBubbleColor = p.bubbleColor || '#a3ccc4';
+            state.settings.userPatSuffixes = Array.isArray(p.patSuffixes) ? p.patSuffixes : [];
+            state.settings.userPersona = p.persona || '';
+        };
+        const saveCharacters = async () => { await localforage.setItem('characters', state.characters); };
+        const savePersonas = async () => { await localforage.setItem('personas', state.personas); };
+
+        // 首次运行时，从旧版单角色数据迁移出默认角色 / 身份
+        const loadOrInitProfiles = async () => {
+            let chars = await localforage.getItem('characters');
+            if (!chars || !Array.isArray(chars.list) || chars.list.length === 0) {
+                const id = 'char_default';
+                chars = { list: [{
+                    id,
+                    name: state.settings.aiName || '伴侣',
+                    prompt: state.settings.aiPrompt || '',
+                    avatar: state.settings.aiAvatar,
+                    bubbleColor: state.settings.aiBubbleColor || '#ffffff',
+                    patSuffixes: state.settings.aiPatSuffixes || [],
+                    worldBook: state.settings.worldBook || [],
+                    createdAt: Date.now(),
+                }], activeId: id };
+                const legacyChat = await localforage.getItem('readingCompanionChat');
+                if (legacyChat) await localforage.setItem('chat_' + id, legacyChat);
+                const legacyMem = await localforage.getItem('readingCompanionMemories');
+                if (legacyMem) await localforage.setItem('memories_' + id, legacyMem);
+                await localforage.setItem('characters', chars);
+            }
+            if (!chars.list.find(c => c.id === chars.activeId)) chars.activeId = chars.list[0].id;
+            state.characters = chars;
+            applyCharacterToSettings(getActiveCharacter());
+
+            let personas = await localforage.getItem('personas');
+            if (!personas || !Array.isArray(personas.list) || personas.list.length === 0) {
+                const id = 'persona_default';
+                personas = { list: [{
+                    id,
+                    name: state.settings.userName || '我',
+                    avatar: state.settings.userAvatar,
+                    bubbleColor: state.settings.userBubbleColor || '#a3ccc4',
+                    patSuffixes: state.settings.userPatSuffixes || [],
+                    persona: state.settings.userPersona || '',
+                    createdAt: Date.now(),
+                }], activeId: id };
+                await localforage.setItem('personas', personas);
+            }
+            if (!personas.list.find(p => p.id === personas.activeId)) personas.activeId = personas.list[0].id;
+            state.personas = personas;
+            applyPersonaToSettings(getActivePersona());
+        };
+
+        const switchCharacter = async (id) => {
+            if (!id || id === state.characters.activeId) return;
+            const target = state.characters.list.find(c => c.id === id);
+            if (!target) return;
+            syncSettingsToActiveCharacter();
+            await saveChatHistory();
+            await saveMemories();
+            state.characters.activeId = id;
+            await saveCharacters();
+            applyCharacterToSettings(target);
+            await loadChatHistory();
+            await loadMemories();
+            applySettings();
+            renderProfiles();
+            addSystemMessage(`已切换到角色「${target.name}」`, true);
+        };
+
+        const switchPersona = async (id) => {
+            if (!id || id === state.personas.activeId) return;
+            const target = state.personas.list.find(p => p.id === id);
+            if (!target) return;
+            syncSettingsToActivePersona();
+            state.personas.activeId = id;
+            await savePersonas();
+            applyPersonaToSettings(target);
+            applySettings();
+            renderProfiles();
+            addSystemMessage(`已切换到身份「${target.name}」`, true);
+        };
+
+        const createCharacter = async () => {
+            syncSettingsToActiveCharacter();
+            await saveChatHistory();
+            await saveMemories();
+            const id = genProfileId('char');
+            const c = {
+                id, name: '新角色',
+                prompt: '请在设置里完善这个角色的人设。',
+                avatar: state.settings.aiAvatar,
+                bubbleColor: '#ffffff',
+                patSuffixes: ['的脑袋', '的小手'],
+                worldBook: [],
+                createdAt: Date.now(),
+            };
+            state.characters.list.push(c);
+            state.characters.activeId = id;
+            await saveCharacters();
+            applyCharacterToSettings(c);
+            await loadChatHistory();   // 新角色无历史，会清空聊天区
+            await loadMemories();
+            applySettings();
+            hideProfilesModal();
+            showSettings();
+            addSystemMessage('已创建新角色，请在设置里完善人设后保存', true);
+        };
+
+        const createPersona = async () => {
+            syncSettingsToActivePersona();
+            const id = genProfileId('persona');
+            const p = {
+                id, name: '新身份',
+                avatar: state.settings.userAvatar,
+                bubbleColor: '#a3ccc4',
+                patSuffixes: ['的脸颊'],
+                persona: '',
+                createdAt: Date.now(),
+            };
+            state.personas.list.push(p);
+            state.personas.activeId = id;
+            await savePersonas();
+            applyPersonaToSettings(p);
+            applySettings();
+            hideProfilesModal();
+            showSettings();
+            addSystemMessage('已创建新身份，请在设置里完善后保存', true);
+        };
+
+        const deleteCharacter = async (id) => {
+            if (state.characters.list.length <= 1) { alert('至少要保留一个 AI 角色'); return; }
+            const target = state.characters.list.find(c => c.id === id);
+            if (!target) return;
+            if (!confirm(`确定删除角色「${target.name}」？该角色独立的聊天记录与记忆也会一并删除。`)) return;
+            state.characters.list = state.characters.list.filter(c => c.id !== id);
+            await localforage.removeItem('chat_' + id);
+            await localforage.removeItem('memories_' + id);
+            const wasActive = state.characters.activeId === id;
+            if (wasActive) state.characters.activeId = state.characters.list[0].id;
+            await saveCharacters();
+            if (wasActive) {
+                applyCharacterToSettings(getActiveCharacter());
+                await loadChatHistory();
+                await loadMemories();
+                applySettings();
+            }
+            renderProfiles();
+        };
+
+        const deletePersona = async (id) => {
+            if (state.personas.list.length <= 1) { alert('至少要保留一个身份'); return; }
+            const target = state.personas.list.find(p => p.id === id);
+            if (!target) return;
+            if (!confirm(`确定删除身份「${target.name}」？`)) return;
+            state.personas.list = state.personas.list.filter(p => p.id !== id);
+            const wasActive = state.personas.activeId === id;
+            if (wasActive) state.personas.activeId = state.personas.list[0].id;
+            await savePersonas();
+            if (wasActive) { applyPersonaToSettings(getActivePersona()); applySettings(); }
+            renderProfiles();
+        };
+
+        let profilesTab = 'char';
+        const buildProfileCard = (item, kind, activeId, subText) => {
+            const active = item.id === activeId;
+            const card = document.createElement('div');
+            card.className = 'pf-card' + (active ? ' active' : '');
+            card.dataset.id = item.id;
+            card.dataset.kind = kind;
+            const escSub = (subText || '').replace(/</g, '&lt;');
+            card.innerHTML =
+                `<img class="pf-avatar" src="${item.avatar || ''}" alt="">` +
+                `<div class="pf-info"><div class="pf-name">${(item.name || '未命名').replace(/</g,'&lt;')}${active ? ' <span class="pf-badge">当前</span>' : ''}</div><div class="pf-sub">${escSub || '（暂无描述）'}</div></div>` +
+                `<div class="pf-actions">` +
+                `<button class="pf-edit" data-id="${item.id}" data-kind="${kind}">编辑</button>` +
+                `<button class="pf-del" data-id="${item.id}" data-kind="${kind}">删除</button>` +
+                `</div>`;
+            return card;
+        };
+        const renderProfiles = () => {
+            if (!dom.pfCharList || !dom.pfPersonaList) return;
+            dom.pfCharList.innerHTML = '';
+            (state.characters.list || []).forEach(c => {
+                const sub = (c.prompt || '').replace(/<[^>]*>/g, '').slice(0, 40);
+                dom.pfCharList.appendChild(buildProfileCard(c, 'char', state.characters.activeId, sub));
+            });
+            dom.pfPersonaList.innerHTML = '';
+            (state.personas.list || []).forEach(p => {
+                const sub = (p.persona || '').replace(/<[^>]*>/g, '').slice(0, 40);
+                dom.pfPersonaList.appendChild(buildProfileCard(p, 'persona', state.personas.activeId, sub));
+            });
+            dom.pfCharList.style.display = profilesTab === 'char' ? 'block' : 'none';
+            dom.pfPersonaList.style.display = profilesTab === 'persona' ? 'block' : 'none';
+            dom.pfTabs.forEach(t => t.classList.toggle('active', t.dataset.tab === profilesTab));
+        };
+        const showProfilesModal = () => { renderProfiles(); if (dom.profilesModal) dom.profilesModal.classList.add('show'); };
+        const hideProfilesModal = () => { if (dom.profilesModal) dom.profilesModal.classList.remove('show'); };
+
         const applyPaginationMode = () => {
             const mode = state.settings.reading.paginationMode;
             if (mode === 'flip') {
@@ -2006,7 +2293,15 @@
             });
         };
 
-        const addMessage = (sender, content, { timestamp = Date.now(), addToHistory = false, fromStorage = false, internal = false } = {}) => { /* same code */
+        const addMessage = (sender, content, { timestamp = Date.now(), addToHistory = false, fromStorage = false, internal = false, annotation = false } = {}) => { /* same code */
+            if (annotation) {
+                // 书籍批注：不在聊天框里显示，但保留进聊天历史，让角色在对话中仍能知晓批注内容
+                if (addToHistory) {
+                    state.chat.history.push({ sender, content, timestamp, internal, annotation: true });
+                    saveChatHistory();
+                }
+                return;
+            }
             removeTypingIndicator();
             const wrapper = document.createElement('div');
             wrapper.className = `message-wrapper ${sender}`;
@@ -2325,17 +2620,27 @@
             }
         };
 
-        const saveChatHistory = async () => { await localforage.setItem('readingCompanionChat', state.chat.history); };
+        const saveChatHistory = async () => {
+            const cid = state.characters.activeId;
+            if (!cid) return;
+            await localforage.setItem('chat_' + cid, state.chat.history);
+        };
 
-        // ===== 长期记忆存储 =====
+        // ===== 长期记忆存储（按角色隔离）=====
         const saveMemories = async () => {
-            await localforage.setItem('readingCompanionMemories', {
+            const cid = state.characters.activeId;
+            if (!cid) return;
+            await localforage.setItem('memories_' + cid, {
                 entries: state.memories,
                 lastSummarizedTimestamp: state.memoryMeta.lastSummarizedTimestamp || 0,
             });
         };
         const loadMemories = async () => {
-            const saved = await localforage.getItem('readingCompanionMemories');
+            const cid = state.characters.activeId;
+            state.memories = [];
+            state.memoryMeta.lastSummarizedTimestamp = 0;
+            if (!cid) return;
+            const saved = await localforage.getItem('memories_' + cid);
             if (saved && typeof saved === 'object') {
                 state.memories = Array.isArray(saved.entries) ? saved.entries : [];
                 state.memoryMeta.lastSummarizedTimestamp = saved.lastSummarizedTimestamp || 0;
@@ -2405,22 +2710,25 @@
 
 
         const loadChatHistory = async () => {
-            const savedChat = await localforage.getItem('readingCompanionChat');
+            const cid = state.characters.activeId;
+            const savedChat = cid ? await localforage.getItem('chat_' + cid) : null;
+            dom.messageContainer.innerHTML = '';
+            state.chat.history = [];
+            state.chat.lastMessageTimestamp = 0;
             if (savedChat) {
                 try {
                     state.chat.history = savedChat;
-                    dom.messageContainer.innerHTML = '';
-                    state.chat.lastMessageTimestamp = 0;
-                    state.chat.history.forEach(msg => addMessage(msg.sender, msg.content, { timestamp: msg.timestamp, fromStorage: true, internal: msg.internal }));
+                    state.chat.history.forEach(msg => addMessage(msg.sender, msg.content, { timestamp: msg.timestamp, fromStorage: true, internal: msg.internal, annotation: msg.annotation }));
                     dom.chatArea.scrollTop = dom.chatArea.scrollHeight;
-                } catch (e) { await localforage.removeItem('readingCompanionChat'); }
+                } catch (e) { state.chat.history = []; if (cid) await localforage.removeItem('chat_' + cid); }
             }
         };
         const clearChatHistory = async () => {
-            if (confirm('确定要清除所有聊天记录吗？')) {
+            if (confirm('确定要清除当前角色的聊天记录吗？')) {
                 state.chat.history = [];
                 state.chat.lastMessageTimestamp = 0;
-                await localforage.removeItem('readingCompanionChat');
+                const cid = state.characters.activeId;
+                if (cid) await localforage.removeItem('chat_' + cid);
                 dom.messageContainer.innerHTML = '';
                 addSystemMessage('聊天记录已清除');
             }
@@ -2678,7 +2986,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                     const finalResponse = deTic(aiResponse.replace(/__PAT_[\w-]+__/g, '').trim());
                     const commentData = { text: finalResponse, type: 'ai', highlightId: thinkingIcon.dataset.highlightId, quote: quote };
                     const content = `<div class="quote">${quote}</div>${finalResponse}`;
-                    addMessage('ai', content, { addToHistory: true });
+                    addMessage('ai', content, { addToHistory: true, annotation: true });
                     await fillCommentPlaceholder(pElement, thinkingIcon, commentData);
                 }
             });
@@ -3695,13 +4003,29 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
 
         // NEW FEATURE: Export/Import Data
         const handleExportData = async () => {
+            // 先把当前编辑与聊天/记忆落盘，保证导出的是最新数据
+            syncSettingsToActiveCharacter();
+            syncSettingsToActivePersona();
+            await saveCharacters();
+            await savePersonas();
+            await saveChatHistory();
+            await saveMemories();
+            // 收集每个角色独立的聊天与记忆
+            const chats = {};
+            const characterMemories = {};
+            for (const c of (state.characters.list || [])) {
+                chats[c.id] = (await localforage.getItem('chat_' + c.id)) || [];
+                characterMemories[c.id] = (await localforage.getItem('memories_' + c.id)) || { entries: [], lastSummarizedTimestamp: 0 };
+            }
             const data = {
                 settings: state.settings,
                 books: state.books,
-                chat: state.chat,
                 summaries: state.summaries,
-                memories: { entries: state.memories, lastSummarizedTimestamp: state.memoryMeta.lastSummarizedTimestamp || 0 },
-                version: "3.0"
+                characters: state.characters,
+                personas: state.personas,
+                chats,
+                characterMemories,
+                version: "4.0"
             };
             const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
@@ -3721,10 +4045,30 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                     const data = JSON.parse(e.target.result);
                     if(data.settings) await localforage.setItem('readingCompanionSettings', data.settings);
                     if(data.books) await localforage.setItem('books', data.books);
-                    if(data.chat) await localforage.setItem('readingCompanionChat', data.chat.history || data.chat); // compatibility
                     if(data.summaries) await localforage.setItem('readingCompanionSummaries', data.summaries);
-                    if(data.memories) await localforage.setItem('readingCompanionMemories', data.memories);
-                    
+
+                    if (data.version === "4.0" && data.characters) {
+                        // 新版：恢复多角色 / 多身份及各自独立的聊天与记忆
+                        await localforage.setItem('characters', data.characters);
+                        if (data.personas) await localforage.setItem('personas', data.personas);
+                        if (data.chats) {
+                            for (const cid of Object.keys(data.chats)) {
+                                await localforage.setItem('chat_' + cid, data.chats[cid]);
+                            }
+                        }
+                        if (data.characterMemories) {
+                            for (const cid of Object.keys(data.characterMemories)) {
+                                await localforage.setItem('memories_' + cid, data.characterMemories[cid]);
+                            }
+                        }
+                    } else {
+                        // 旧版备份：写入旧键，下次启动时会自动迁移为默认角色
+                        await localforage.removeItem('characters');
+                        await localforage.removeItem('personas');
+                        if(data.chat) await localforage.setItem('readingCompanionChat', data.chat.history || data.chat);
+                        if(data.memories) await localforage.setItem('readingCompanionMemories', data.memories);
+                    }
+
                     alert('数据导入成功，即将刷新页面...');
                     location.reload();
                 } catch(err) {
@@ -3856,6 +4200,39 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         });
         
         dom.settingsBtn.addEventListener('click', showSettings);
+
+        // 角色 / 身份 管理弹窗
+        if (dom.profilesBtn) dom.profilesBtn.addEventListener('click', showProfilesModal);
+        if (dom.pfCloseBtn) dom.pfCloseBtn.addEventListener('click', hideProfilesModal);
+        if (dom.profilesModal) dom.profilesModal.addEventListener('click', (e) => { if (e.target === dom.profilesModal) hideProfilesModal(); });
+        if (dom.pfTabs) dom.pfTabs.forEach(t => t.addEventListener('click', () => { profilesTab = t.dataset.tab; renderProfiles(); }));
+        if (dom.pfAddBtn) dom.pfAddBtn.addEventListener('click', () => { if (profilesTab === 'char') createCharacter(); else createPersona(); });
+        const handleProfileListClick = async (e) => {
+            const editBtn = e.target.closest('.pf-edit');
+            if (editBtn) {
+                e.stopPropagation();
+                const { id, kind } = editBtn.dataset;
+                if (kind === 'char') await switchCharacter(id); else await switchPersona(id);
+                hideProfilesModal();
+                showSettings();
+                return;
+            }
+            const delBtn = e.target.closest('.pf-del');
+            if (delBtn) {
+                e.stopPropagation();
+                const { id, kind } = delBtn.dataset;
+                if (kind === 'char') deleteCharacter(id); else deletePersona(id);
+                return;
+            }
+            const card = e.target.closest('.pf-card');
+            if (card) {
+                const { id, kind } = card.dataset;
+                if (kind === 'char') { await switchCharacter(id); hideProfilesModal(); }
+                else { await switchPersona(id); }
+            }
+        };
+        if (dom.pfCharList) dom.pfCharList.addEventListener('click', handleProfileListClick);
+        if (dom.pfPersonaList) dom.pfPersonaList.addEventListener('click', handleProfileListClick);
         dom.settingsBackBtn.addEventListener('click', hideSettings);
         dom.saveSettingsBtn.addEventListener('click', saveSettings);
         if (dom.addWorldEntryBtn) dom.addWorldEntryBtn.addEventListener('click', () => dom.worldBookContainer.appendChild(createWorldEntryRow()));
@@ -3981,9 +4358,12 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
 
         const initializeApp = async () => {
             await loadSettings();
-            await loadChatHistory();
+            await loadOrInitProfiles();   // 建立/迁移角色与身份，并把激活项写入 settings
+            await loadChatHistory();      // 载入当前角色的独立聊天
             await loadSummaries();
-            await loadMemories();
+            await loadMemories();         // 载入当前角色的独立记忆
+            applySettings();              // 依据激活的角色/身份刷新界面
+            renderProfiles();
             state.books = await localforage.getItem('books') || {};
             state.activeBookId = await localforage.getItem('lastActiveBookId');
             if (state.activeBookId && !state.books[state.activeBookId]) { state.activeBookId = null; await localforage.removeItem('lastActiveBookId'); }
