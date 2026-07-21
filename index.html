@@ -356,6 +356,11 @@
         .settings-header h2 { margin: 0; font-size: 18px; flex-grow: 1; text-align: center; transform: translateX(-12px); }
         .settings-content { flex-grow: 1; overflow-y: auto; padding: 20px; background-color: var(--bg-color); }
         .settings-group { background-color: #fff; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px var(--shadow-light); }
+        /* 角色设置 / 通用设置 分屏：按作用域只显示对应分组 */
+        .settings-content.scope-char .settings-group:not(.sg-char) { display: none; }
+        .settings-content.scope-general .settings-group.sg-char { display: none; }
+        .char-scope-hint { background:#fff; border-radius:15px; padding:12px 16px; margin-bottom:16px; font-size:13px; color:var(--secondary-text-color); box-shadow:0 2px 8px var(--shadow-light); display:none; }
+        .settings-content.scope-char .char-scope-hint { display:block; }
         .settings-group h3 { margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid var(--panel-bg-color); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .form-item { margin-bottom: 15px; }
         .form-item label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; }
@@ -579,6 +584,31 @@
         .pf-footer { display: flex; gap: 10px; padding: 12px; border-top: 1px solid #eee; flex-shrink: 0; }
         .pf-footer button { flex: 1; }
 
+        /* 阅读页「更多」下拉菜单 */
+        .reader-more-wrap { position: relative; display: inline-flex; }
+        .reader-more-menu {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+            padding: 6px;
+            display: none;
+            flex-direction: column;
+            min-width: 148px;
+            z-index: 60;
+        }
+        .reader-more-menu.show { display: flex; }
+        .reader-more-menu button {
+            display: flex; align-items: center; gap: 10px;
+            background: none; border: none; padding: 10px 12px; border-radius: 8px;
+            font-size: 14px; color: var(--primary-text-color); cursor: pointer; font-family: inherit;
+            width: 100%; text-align: left; white-space: nowrap;
+        }
+        .reader-more-menu button:hover, .reader-more-menu button:active { background: var(--panel-bg-color); }
+        .reader-more-menu button svg { width: 20px; height: 20px; fill: var(--secondary-text-color); flex-shrink: 0; }
+
         input[type="file"] { display: none; }
     </style>
 </head>
@@ -606,10 +636,15 @@
                     <div class="right-icons">
                          <button class="icon-btn" id="reader-comment-btn" title="让伴侣点评本章"><svg viewBox="0 0 24 24"><path d="M9,22A1,1 0 0,1 8,21V18H4A2,2 0 0,1 2,16V4C2,2.89 2.9,2 4,2H20A2,2 0 0,1 22,4V16A2,2 0 0,1 20,18H13.9L10.2,21.71C10,21.9 9.75,22 9.5,22V22H9M10,16V19.08L13.08,16H20V4H4V16H10M16.25,6.88C17.11,6.88 17.81,7.58 17.81,8.44C17.81,9.31 17.11,10 16.25,10C15.38,10 14.69,9.31 14.69,8.44C14.69,7.58 15.38,6.88 16.25,6.88M11.75,6.88C12.61,6.88 13.31,7.58 13.31,8.44C13.31,9.31 12.61,10 11.75,10C10.88,10 10.19,9.31 10.19,8.44C10.19,7.58 10.88,6.88 11.75,6.88M7.25,6.88C8.11,6.88 8.81,7.58 8.81,8.44C8.81,9.31 8.11,10 7.25,10C6.38,10 5.69,9.31 5.69,8.44C5.69,7.58 6.38,6.88 7.25,6.88Z" /></svg></button>
                          <button class="icon-btn" id="search-btn" title="全文搜索"><svg viewBox="0 0 24 24"><path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z" /></svg></button>
-                        <button class="icon-btn" id="summary-btn" title="章节摘要"><svg viewBox="0 0 24 24"><path d="M14 17H16V19H14V17M14 15H16V10H14V15M20 2H4C2.9 2 2 2.9 2 4V20C2 21.1 2.9 22 4 22H20C21.1 22 22 21.1 22 20V4C22 2.9 21.1 2 20 2M12 9H8V5H12V9M20 20H4V4H20V20Z"/></svg></button>
-                        <button class="icon-btn" id="notes-btn" title="书籍笔记"><svg viewBox="0 0 24 24"><path d="M17,3H7A2,2 0 0,0 5,5V21L12,18L19,21V5A2,2 0 0,0 17,3M17,18L12,15.82L7,18V5H17V18M8,7H16V9H8V7M8,11H16V13H8V11Z" /></svg></button>
-                        <button class="icon-btn" id="tts-btn" title="朗读本页"><svg viewBox="0 0 24 24"><path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z" /></svg></button>
                         <button class="icon-btn" id="change-book-btn" title="书架"><svg viewBox="0 0 24 24"><path d="M13,3V9H21V3M13,21H21V11H13M3,21H11V15H3M3,13H11V3H3V13Z"/></svg></button>
+                        <div class="reader-more-wrap">
+                            <button class="icon-btn" id="reader-more-btn" title="更多"><svg viewBox="0 0 24 24"><path d="M12,16A2,2 0 0,1 14,18A2,2 0 0,1 12,20A2,2 0 0,1 10,18A2,2 0 0,1 12,16M12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12A2,2 0 0,1 12,10M12,4A2,2 0 0,1 14,6A2,2 0 0,1 12,8A2,2 0 0,1 10,6A2,2 0 0,1 12,4Z"/></svg></button>
+                            <div class="reader-more-menu" id="reader-more-menu">
+                                <button id="summary-btn"><svg viewBox="0 0 24 24"><path d="M14 17H16V19H14V17M14 15H16V10H14V15M20 2H4C2.9 2 2 2.9 2 4V20C2 21.1 2.9 22 4 22H20C21.1 22 22 21.1 22 20V4C22 2.9 21.1 2 20 2M12 9H8V5H12V9M20 20H4V4H20V20Z"/></svg>章节摘要</button>
+                                <button id="notes-btn"><svg viewBox="0 0 24 24"><path d="M17,3H7A2,2 0 0,0 5,5V21L12,18L19,21V5A2,2 0 0,0 17,3M17,18L12,15.82L7,18V5H17V18M8,7H16V9H8V7M8,11H16V13H8V11Z" /></svg>书籍笔记</button>
+                                <button id="tts-btn"><svg viewBox="0 0 24 24"><path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z" /></svg>朗读本页</button>
+                            </div>
+                        </div>
                     </div>
                 </header>
                 <div class="reader-content-wrapper" id="reader-content-wrapper">
@@ -639,9 +674,10 @@
             <div id="settings-view" class="view">
                 <header class="settings-header">
                     <button class="icon-btn" id="settings-back-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z" /></svg></button>
-                    <h2>设置</h2>
+                    <h2 id="settings-title">设置</h2>
                 </header>
-                <div class="settings-content">
+                <div class="settings-content" id="settings-content">
+                    <div class="char-scope-hint" id="char-scope-hint">正在编辑该角色的专属配置，改动只作用于当前角色，不影响其他角色。</div>
                     
                     <div class="settings-group">
                         <h3>聊天 API</h3>
@@ -688,7 +724,7 @@
                         <div class="form-item"><label for="summary-api-model">模型 (Model)</label><input type="text" id="summary-api-model" placeholder="用于摘要的模型 (可选)"></div>
                     </div>
 
-                    <div class="settings-group">
+                    <div class="settings-group sg-char">
                         <h3>伴侣设定</h3>
                         <div class="form-item"><label for="ai-name">姓名</label><input type="text" id="ai-name"></div>
                         <div class="form-item"><label for="ai-pat-suffixes">拍一拍后缀（多条用换行分隔）</label><textarea id="ai-pat-suffixes" rows="3" placeholder="例如：
@@ -700,7 +736,7 @@
                         <div class="form-item"><label>聊天气泡</label><input type="color" id="ai-bubble-color-input"></div>
                         <div class="form-item"><label for="ai-prompt">人设 (Prompt)</label><textarea id="ai-prompt" placeholder=""></textarea></div>
                     </div>
-                    <div class="settings-group">
+                    <div class="settings-group sg-char">
                         <h3>用户设定</h3>
                         <div class="form-item"><label for="user-name">姓名</label><input type="text" id="user-name"></div>
                         <div class="form-item"><label for="user-pat-suffixes">自我拍一拍后缀（多条用换行分隔）</label><textarea id="user-pat-suffixes" rows="3" placeholder="例如：
@@ -712,7 +748,7 @@
                         <div class="form-item"><label>聊天背景</label><button class="inline-btn" onclick="document.getElementById('chat-bg-input').click()">更换聊天背景</button></div>
                         <div class="form-item"><label for="user-persona">用户人设（你是谁，AI 会据此了解并对待你）</label><textarea id="user-persona" rows="4" placeholder="例如：我叫小夏，25岁，安静内向，喜欢在深夜读书。希望你像相识多年的老友一样陪着我。"></textarea></div>
                     </div>
-                    <div class="settings-group">
+                    <div class="settings-group sg-char">
                         <h3>角色扮演 &amp; 世界书</h3>
                         <div class="form-item">
                             <label for="rp-immersive">沉浸式扮演（允许神态 / 动作 / 心理描写）</label>
@@ -737,7 +773,7 @@
                             <button id="add-world-entry-btn" class="inline-btn action-btn" style="margin-top:8px;">+ 添加世界书条目</button>
                         </div>
                     </div>
-                    <div class="settings-group">
+                    <div class="settings-group sg-char">
                         <h3>记忆</h3>
                         <div class="form-item">
                             <label for="memory-enabled">启用长期记忆</label>
@@ -758,7 +794,7 @@
                             <button id="memory-summarize-now-btn" class="inline-btn action-btn" style="margin-top:8px;">立即总结尚未记录的对话</button>
                         </div>
                     </div>
-                    <div class="settings-group">
+                    <div class="settings-group sg-char">
                         <h3>阅读陪伴</h3>
                         <div class="form-item">
                             <label for="care-enabled">久读关心（连续阅读一段时间后主动提醒休息）</label>
@@ -777,7 +813,7 @@
                             <input type="checkbox" id="chapter-end-enabled">
                         </div>
                     </div>
-                    <div class="settings-group">
+                    <div class="settings-group sg-char">
                         <h3>语音朗读 (TTS)</h3>
                         <p style="font-size:12px;color:var(--secondary-text-color);margin:0 0 8px;">接入 MiniMax 语音合成，让伴侣为你朗读。若浏览器直连被跨域(CORS)拦截，可把"接口地址"改成你自己的代理地址。</p>
                         <div class="form-item"><label for="tts-api-url">接口地址</label><input type="text" id="tts-api-url" placeholder="https://api.minimaxi.com/v1/t2a_v2"></div>
@@ -1136,6 +1172,8 @@
             summaryBtn: document.getElementById('summary-btn'),
             searchBtn: document.getElementById('search-btn'),
             readerCommentBtn: document.getElementById('reader-comment-btn'),
+            readerMoreBtn: document.getElementById('reader-more-btn'),
+            readerMoreMenu: document.getElementById('reader-more-menu'),
             notesBtn: document.getElementById('notes-btn'),
             notesModal: document.getElementById('notes-modal'),
             notesTitle: document.getElementById('notes-title'),
@@ -1150,6 +1188,8 @@
             tocOverlay: document.getElementById('toc-overlay'),
             tocList: document.getElementById('toc-list'),
             settingsView: document.getElementById('settings-view'),
+            settingsContent: document.getElementById('settings-content'),
+            settingsTitle: document.getElementById('settings-title'),
             settingsBtn: document.getElementById('settings-btn'),
             profilesBtn: document.getElementById('profiles-btn'),
             profilesModal: document.getElementById('profiles-modal'),
@@ -1573,7 +1613,22 @@
                 }, 100);
             }
         };
-        const showSettings = () => dom.settingsView.classList.add('active');
+        // mode: 'general'（通用设置）| 'char'（当前角色的专属编辑界面）
+        const showSettings = (mode = 'general') => {
+            const content = dom.settingsContent;
+            if (content) {
+                content.classList.toggle('scope-char', mode === 'char');
+                content.classList.toggle('scope-general', mode !== 'char');
+                content.scrollTop = 0;
+            }
+            if (dom.settingsTitle) {
+                dom.settingsTitle.textContent = mode === 'char'
+                    ? `编辑角色：${state.settings.aiName || '角色'}`
+                    : '设置';
+            }
+            dom.settingsView.classList.add('active');
+        };
+        const showCharacterSettings = () => showSettings('char');
         const hideSettings = () => dom.settingsView.classList.remove('active');
 
         // ===== 世界书（Lorebook）编辑器 =====
@@ -2089,6 +2144,7 @@
             applyCharacterToSettings(target);
             await loadChatHistory();
             await loadMemories();
+            if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent(); }
             applySettings();
             renderProfiles();
             addSystemMessage(`已切换到角色「${target.name}」`, true);
@@ -2127,9 +2183,10 @@
             applyCharacterToSettings(c);
             await loadChatHistory();   // 新角色无历史，会清空聊天区
             await loadMemories();
+            if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent(); }
             applySettings();
             hideProfilesModal();
-            showSettings();
+            showCharacterSettings();
             addSystemMessage('已创建新角色，请在设置里完善人设后保存', true);
         };
 
@@ -2150,7 +2207,7 @@
             applyPersonaToSettings(p);
             applySettings();
             hideProfilesModal();
-            showSettings();
+            showCharacterSettings();
             addSystemMessage('已创建新身份，请在设置里完善后保存', true);
         };
 
@@ -2169,6 +2226,7 @@
                 applyCharacterToSettings(getActiveCharacter());
                 await loadChatHistory();
                 await loadMemories();
+                if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent(); }
                 applySettings();
             }
             renderProfiles();
@@ -2742,12 +2800,15 @@
             reader.onload = async (e) => {
                 const bookId = `book-${Date.now()}`;
                 const bookTitle = file.name.replace(/\.txt$/i, '');
-                const newBook = { id: bookId, title: bookTitle, paragraphs: e.target.result.split('\n'), toc: [], currentChapter: '', comments: {}, lastScrollTop: 0, lastScrollLeft: 0 };
+                const newBook = { id: bookId, title: bookTitle, paragraphs: e.target.result.split('\n'), toc: [], currentChapter: '', comments: {}, lastScrollTop: 0, lastScrollLeft: 0, _loaded: true };
                 state.books[bookId] = newBook;
                 state.activeBookId = bookId;
-                await localforage.setItem('books', state.books);
-                await localforage.setItem('lastActiveBookId', bookId);
                 generateTOC();
+                await saveBookContent(bookId);
+                await saveBookProgress(bookId);
+                await saveBookIndex();
+                await localforage.setItem('lastActiveBookId', bookId);
+                await loadCommentsForActiveBook();
                 displayBookContent();
                 hideBookListModal();
                 switchView('reader-view');
@@ -2763,6 +2824,8 @@
         const loadBook = async (bookId) => {
             if (!state.books[bookId]) return;
             state.activeBookId = bookId;
+            await ensureBookLoaded(bookId);
+            await loadCommentsForActiveBook();
             await localforage.setItem('lastActiveBookId', bookId);
             displayBookContent();
             hideBookListModal();
@@ -2773,12 +2836,16 @@
             if (confirm(`确定要删除《${state.books[bookId].title}》吗？`)) {
                 delete state.summaries[state.books[bookId].title];
                 delete state.books[bookId];
+                await localforage.removeItem('book_' + bookId);
+                await localforage.removeItem('bookprog_' + bookId);
+                // 删除该书在所有角色下的批注
+                (state.characters.list || []).forEach(async c => { await localforage.removeItem(`comments_${c.id}_${bookId}`); });
                 if (state.activeBookId === bookId) {
                     state.activeBookId = null;
                     await localforage.removeItem('lastActiveBookId');
                     displayBookContent();
                 }
-                await localforage.setItem('books', state.books);
+                await saveBookIndex();
                 await localforage.setItem('readingCompanionSummaries', state.summaries);
                 renderBookList();
             }
@@ -2905,7 +2972,89 @@
             if (!activeBook) return;
             activeBook.lastScrollTop = dom.readerContentWrapper.scrollTop;
             activeBook.lastScrollLeft = dom.readerContentWrapper.scrollLeft;
-            await localforage.setItem('books', state.books);
+            await saveBookProgress(activeBook.id);
+        };
+
+        // ===== 书籍分片存储：正文只写一次，进度高频但极小，批注按角色隔离 =====
+        // 只保存正文与目录（导入 / 目录变化时调用，很少触发）
+        const saveBookContent = async (id) => {
+            const b = state.books[id];
+            if (!b) return;
+            await localforage.setItem('book_' + id, { id: b.id, title: b.title, paragraphs: b.paragraphs || [], toc: b.toc || [] });
+        };
+        // 只保存阅读进度（滚动时高频调用，体积极小）
+        const saveBookProgress = async (id) => {
+            const b = state.books[id];
+            if (!b) return;
+            await localforage.setItem('bookprog_' + id, {
+                currentChapter: b.currentChapter || '',
+                lastScrollTop: b.lastScrollTop || 0,
+                lastScrollLeft: b.lastScrollLeft || 0,
+            });
+        };
+        // 书架索引（只含 id + 标题，启动时无需读取全部正文）
+        const saveBookIndex = async () => {
+            const index = Object.values(state.books).map(b => ({ id: b.id, title: b.title }));
+            await localforage.setItem('bookIndex', index);
+        };
+        // 当前角色 + 指定书 的批注存储键
+        const commentsKey = (bookId) => `comments_${state.characters.activeId || 'char_default'}_${bookId}`;
+        const saveComments = async () => {
+            const b = getActiveBook();
+            if (!b) return;
+            await localforage.setItem(commentsKey(b.id), b.comments || {});
+        };
+        const loadCommentsForActiveBook = async () => {
+            const b = getActiveBook();
+            if (!b) return;
+            const saved = await localforage.getItem(commentsKey(b.id));
+            b.comments = (saved && typeof saved === 'object') ? saved : {};
+        };
+        // 懒加载：只有真正打开某本书时才把正文读进内存
+        const ensureBookLoaded = async (id) => {
+            const b = state.books[id];
+            if (!b) return null;
+            if (b._loaded) return b;
+            const content = await localforage.getItem('book_' + id);
+            if (content) { b.paragraphs = content.paragraphs || []; b.toc = content.toc || []; if (content.title) b.title = content.title; }
+            const prog = await localforage.getItem('bookprog_' + id) || {};
+            b.currentChapter = prog.currentChapter || '';
+            b.lastScrollTop = prog.lastScrollTop || 0;
+            b.lastScrollLeft = prog.lastScrollLeft || 0;
+            b._loaded = true;
+            return b;
+        };
+        // 启动时加载书架索引（正文懒加载），并一次性迁移旧的单一 'books' 键
+        const loadBooks = async () => {
+            let index = await localforage.getItem('bookIndex');
+            if (!index) {
+                const old = await localforage.getItem('books');
+                if (old && typeof old === 'object' && Object.keys(old).length) {
+                    state.books = {};
+                    const defChar = state.characters.activeId || 'char_default';
+                    for (const id of Object.keys(old)) {
+                        const b = old[id];
+                        b._loaded = true;
+                        state.books[id] = b;
+                        await saveBookContent(id);
+                        await saveBookProgress(id);
+                        if (b.comments && Object.keys(b.comments).length) {
+                            await localforage.setItem(`comments_${defChar}_${id}`, b.comments);
+                        }
+                        b.comments = {}; // 内存里改由 loadCommentsForActiveBook 按角色加载
+                    }
+                    await saveBookIndex();
+                    await localforage.removeItem('books');
+                    return;
+                }
+                index = [];
+                await localforage.setItem('bookIndex', index);
+            }
+            // 依据索引建立轻量骨架，正文延后按需加载
+            state.books = {};
+            (index || []).forEach(item => {
+                state.books[item.id] = { id: item.id, title: item.title, paragraphs: [], toc: [], currentChapter: '', lastScrollTop: 0, lastScrollLeft: 0, comments: {}, _loaded: false };
+            });
         };
 
         const handleReaderScroll = () => {
@@ -3406,7 +3555,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             const book = getActiveBook();
             if (!book || !book.comments[pid] || !book.comments[pid][idx]) return;
             book.comments[pid][idx].text = (newText || '').trim();
-            await localforage.setItem('books', state.books);
+            await saveComments();
         };
 
         // 删除某条笔记：移除高亮、从书籍数据中删除，必要时清掉段落上的评论图标
@@ -3421,7 +3570,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 const pEl = dom.readerContent.querySelector(`p[data-para-id="${pid}"]`);
                 if (pEl) { const ic = pEl.querySelector('.comment-icon'); if (ic) ic.remove(); }
             }
-            await localforage.setItem('books', state.books);
+            await saveComments();
             renderNotesList();
         };
 
@@ -3653,7 +3802,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             if (!activeBook) return;
             if (!activeBook.comments[paraId]) { activeBook.comments[paraId] = []; }
             activeBook.comments[paraId].push(commentData);
-            await localforage.setItem('books', state.books);
+            await saveComments();
         };
         const addCommentPlaceholder = (pElement, type) => { /* same code */
             const highlightClass = type === 'user' ? 'user-highlight' : 'comment-highlight';
@@ -3721,7 +3870,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 const commentToDelete = activeBook.comments[paraId][commentIndex];
                 removeHighlight(commentToDelete.highlightId);
                 activeBook.comments[paraId].splice(commentIndex, 1);
-                await localforage.setItem('books', state.books);
+                await saveComments();
                 const pElement = document.getElementById(`para-id-${paraId}`);
                 if (pElement && (!activeBook.comments[paraId] || activeBook.comments[paraId].length === 0)) {
                     const icon = pElement.querySelector('.comment-icon');
@@ -4002,32 +4151,23 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             }
         };
 
-        // NEW FEATURE: Export/Import Data
+        // NEW FEATURE: Export/Import Data —— 全量键值转储，覆盖分片存储的所有书籍/角色/批注
         const handleExportData = async () => {
-            // 先把当前编辑与聊天/记忆落盘，保证导出的是最新数据
+            // 先把当前编辑与聊天/记忆/批注/进度落盘，保证导出的是最新数据
             syncSettingsToActiveCharacter();
             syncSettingsToActivePersona();
             await saveCharacters();
             await savePersonas();
             await saveChatHistory();
             await saveMemories();
-            // 收集每个角色独立的聊天与记忆
-            const chats = {};
-            const characterMemories = {};
-            for (const c of (state.characters.list || [])) {
-                chats[c.id] = (await localforage.getItem('chat_' + c.id)) || [];
-                characterMemories[c.id] = (await localforage.getItem('memories_' + c.id)) || { entries: [], lastSummarizedTimestamp: 0 };
-            }
-            const data = {
-                settings: state.settings,
-                books: state.books,
-                summaries: state.summaries,
-                characters: state.characters,
-                personas: state.personas,
-                chats,
-                characterMemories,
-                version: "4.0"
-            };
+            if (getActiveBook()) { await saveComments(); await saveBookProgress(state.activeBookId); }
+            await localforage.setItem('readingCompanionSettings', state.settings);
+
+            const dump = {};
+            const keys = await localforage.keys();
+            for (const k of keys) { dump[k] = await localforage.getItem(k); }
+            const data = { __fullDump__: true, version: "5.0", data: dump };
+
             const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -4044,30 +4184,30 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             reader.onload = async (e) => {
                 try {
                     const data = JSON.parse(e.target.result);
-                    if(data.settings) await localforage.setItem('readingCompanionSettings', data.settings);
-                    if(data.books) await localforage.setItem('books', data.books);
-                    if(data.summaries) await localforage.setItem('readingCompanionSummaries', data.summaries);
 
-                    if (data.version === "4.0" && data.characters) {
-                        // 新版：恢复多角色 / 多身份及各自独立的聊天与记忆
-                        await localforage.setItem('characters', data.characters);
-                        if (data.personas) await localforage.setItem('personas', data.personas);
-                        if (data.chats) {
-                            for (const cid of Object.keys(data.chats)) {
-                                await localforage.setItem('chat_' + cid, data.chats[cid]);
-                            }
-                        }
-                        if (data.characterMemories) {
-                            for (const cid of Object.keys(data.characterMemories)) {
-                                await localforage.setItem('memories_' + cid, data.characterMemories[cid]);
-                            }
+                    if (data.__fullDump__ && data.data) {
+                        // 新版全量备份：清空后逐键恢复
+                        await localforage.clear();
+                        for (const k of Object.keys(data.data)) {
+                            await localforage.setItem(k, data.data[k]);
                         }
                     } else {
-                        // 旧版备份：写入旧键，下次启动时会自动迁移为默认角色
-                        await localforage.removeItem('characters');
-                        await localforage.removeItem('personas');
-                        if(data.chat) await localforage.setItem('readingCompanionChat', data.chat.history || data.chat);
-                        if(data.memories) await localforage.setItem('readingCompanionMemories', data.memories);
+                        // 兼容旧备份（3.0 / 4.0）
+                        if(data.settings) await localforage.setItem('readingCompanionSettings', data.settings);
+                        if(data.books) await localforage.setItem('books', data.books);
+                        if(data.summaries) await localforage.setItem('readingCompanionSummaries', data.summaries);
+                        await localforage.removeItem('bookIndex'); // 触发下次启动从旧 books 迁移
+                        if (data.version === "4.0" && data.characters) {
+                            await localforage.setItem('characters', data.characters);
+                            if (data.personas) await localforage.setItem('personas', data.personas);
+                            if (data.chats) { for (const cid of Object.keys(data.chats)) await localforage.setItem('chat_' + cid, data.chats[cid]); }
+                            if (data.characterMemories) { for (const cid of Object.keys(data.characterMemories)) await localforage.setItem('memories_' + cid, data.characterMemories[cid]); }
+                        } else {
+                            await localforage.removeItem('characters');
+                            await localforage.removeItem('personas');
+                            if(data.chat) await localforage.setItem('readingCompanionChat', data.chat.history || data.chat);
+                            if(data.memories) await localforage.setItem('readingCompanionMemories', data.memories);
+                        }
                     }
 
                     alert('数据导入成功，即将刷新页面...');
@@ -4200,7 +4340,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             if (deleteBtn) deleteBook(deleteBtn.dataset.bookId);
         });
         
-        dom.settingsBtn.addEventListener('click', showSettings);
+        dom.settingsBtn.addEventListener('click', () => showSettings('general'));
 
         // 角色 / 身份 管理弹窗
         if (dom.profilesBtn) dom.profilesBtn.addEventListener('click', showProfilesModal);
@@ -4215,7 +4355,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 const { id, kind } = editBtn.dataset;
                 if (kind === 'char') await switchCharacter(id); else await switchPersona(id);
                 hideProfilesModal();
-                showSettings();
+                showCharacterSettings();
                 return;
             }
             const delBtn = e.target.closest('.pf-del');
@@ -4281,6 +4421,20 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         if (dom.readerCommentBtn) dom.readerCommentBtn.addEventListener('click', manualCommentOnCurrentChapter);
         if (dom.notesBtn) dom.notesBtn.addEventListener('click', showNotesModal);
         if (dom.ttsBtn) dom.ttsBtn.addEventListener('click', startTts);
+
+        // 阅读页「更多」下拉菜单
+        const toggleReaderMore = (show) => {
+            if (!dom.readerMoreMenu) return;
+            const willShow = show === undefined ? !dom.readerMoreMenu.classList.contains('show') : show;
+            dom.readerMoreMenu.classList.toggle('show', willShow);
+        };
+        if (dom.readerMoreBtn) dom.readerMoreBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleReaderMore(); });
+        if (dom.readerMoreMenu) dom.readerMoreMenu.addEventListener('click', () => toggleReaderMore(false)); // 点任一项后收起
+        document.addEventListener('click', (e) => {
+            if (dom.readerMoreMenu && dom.readerMoreMenu.classList.contains('show') && !e.target.closest('.reader-more-wrap')) {
+                toggleReaderMore(false);
+            }
+        });
         if (dom.ttsToggle) dom.ttsToggle.addEventListener('click', pauseResumeTts);
         if (dom.ttsStop) dom.ttsStop.addEventListener('click', stopTts);
         if (dom.ttsSpeed) dom.ttsSpeed.addEventListener('input', () => { dom.ttsSpeedValue.textContent = dom.ttsSpeed.value; });
@@ -4365,9 +4519,10 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             await loadMemories();         // 载入当前角色的独立记忆
             applySettings();              // 依据激活的角色/身份刷新界面
             renderProfiles();
-            state.books = await localforage.getItem('books') || {};
+            await loadBooks();            // 加载书架索引（正文懒加载）
             state.activeBookId = await localforage.getItem('lastActiveBookId');
             if (state.activeBookId && !state.books[state.activeBookId]) { state.activeBookId = null; await localforage.removeItem('lastActiveBookId'); }
+            if (state.activeBookId) { await ensureBookLoaded(state.activeBookId); await loadCommentsForActiveBook(); }
             dom.readerProgressContainer.style.display = 'none';
             displayBookContent();
         };
