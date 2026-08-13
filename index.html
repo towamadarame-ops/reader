@@ -762,7 +762,7 @@
                             <label for="rp-reply-length">回复详细度</label>
                             <select id="rp-reply-length">
                                 <option value="short">简短（1~3 句）</option>
-                                <option value="medium">适中（含少量神态动作）</option>
+                                <option value="medium">适中（通常一两句）</option>
                                 <option value="long">细腻（丰富的描写与画面感）</option>
                             </select>
                         </div>
@@ -2481,10 +2481,18 @@
         };
 
         const getRecentChatHistory = (limit = 20) => {
+            const plain = isPlainDialogueMode();
             return state.chat.history
                 .filter(m => !m.internal && (m.sender === 'user' || m.sender === 'ai'))
                 .slice(-limit)
-                .map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.content.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim() }));
+                .map(m => {
+                    let content = m.content.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+                    // 纯对话模式下，把历史里旧的括号描写也一并清掉，
+                    // 否则 AI 会把上文当范例继续模仿输出（…）这种格式
+                    if (plain && m.sender === 'ai') content = stripStageDirections(content);
+                    return { role: m.sender === 'user' ? 'user' : 'assistant', content };
+                })
+                .filter(m => m.content && m.content.length);
         };
 
         // 将 {{char}} / {{user}} 占位符替换为实际姓名（仿酒馆写法）
@@ -2510,6 +2518,40 @@
             t = t.replace(/[ \t]{2,}/g, ' ').trim();
             // 若清理后几乎为空（原句基本只是笑声），回退原文，避免出现空消息
             return t.length ? t : original;
+        };
+
+        // 是否处于「纯对话模式」（沉浸式扮演关闭 = 只要台词，不要任何动作神态描写）
+        const isPlainDialogueMode = () => (state.settings.rp || {}).immersive === false;
+
+        // 纯对话模式下的兜底清理：删掉括号 / 星号包裹的动作、神态、心理、旁白描写
+        // （提示词约束不稳定，这里在展示与回灌给 AI 之前统一物理剔除）
+        const stripStageDirections = (text) => {
+            if (!text) return text;
+            let t = String(text);
+
+            // 1) 全角括号（…）：整段删除（循环几次以处理连续/简单嵌套）
+            for (let i = 0; i < 3; i++) t = t.replace(/（[^（）\n]{0,150}）/g, '');
+            // 2) 半角括号 (…)：仅当里面含中文时才删，避免误伤颜文字、英文缩写
+            t = t.replace(/\(([^()\n]{0,150})\)/g, (m, inner) => /[\u4e00-\u9fa5]/.test(inner) ? '' : m);
+            // 3) *动作* / **动作** 式旁白
+            t = t.replace(/\*{1,2}([^*\n]{1,150})\*{1,2}/g, '');
+            // 4) 未闭合的括号（回复被截断的情况）：从该括号删到行尾
+            t = t.replace(/（[^（）\n]*$/gm, '');
+            // 5) 清理残留：空行、行首多余标点、重复标点、多余空格
+            t = t.split('\n')
+                 .map(line => line.replace(/^[ \t]*[，。！？、；：~～…—·]+/, '').replace(/[ \t]{2,}/g, ' ').trim())
+                 .filter(line => line.length)
+                 .join('\n');
+            t = t.replace(/([，。！？、；：])\1+/g, '$1').trim();
+
+            // 整条消息本来就只是一段描写时，退化成一个"沉默"的回应，避免空气泡
+            return t.length ? t : '……';
+        };
+
+        // 输出（展示 / 入库 / 回灌）前的统一清理入口
+        const sanitizeReply = (text) => {
+            const t = deTic(text);
+            return isPlainDialogueMode() ? stripStageDirections(t) : t;
         };
 
         // 根据扫描文本，挑选命中的世界书条目（常驻条目始终注入）
@@ -2559,8 +2601,15 @@
             };
             const lengthGuide = lengthOverride || lengthMap[rp.replyLength] || lengthMap.short;
 
+            const immersiveOn = rp.immersive !== false;
+
             const parts = [];
             parts.push(`你正在进行沉浸式的角色扮演。你就是「${charName}」这个真实的人，在陪着「${userName}」一起读书、聊天、生活。绝不承认自己是 AI、程序、模型或助手，绝不跳出角色。`);
+
+            // 【纯对话模式】沉浸式关闭时，最高优先级地禁止任何括号/星号里的动作神态心理描写
+            if (!immersiveOn) {
+                parts.push(`【输出格式·最高优先级·纯聊天模式】\n你现在是在用手机发消息，而不是在写小说。你的每一次输出都必须是「一条聊天消息的文字内容本身」，除此之外什么都不许有。\n严格禁止（无论多短、无论出现在开头中间还是结尾）：\n1. 禁止任何括号内的描写，包括（）、()、【】、[]、{}、<>；\n2. 禁止用 * 或 ** 包裹的动作旁白，如 *轻笑*、*挑眉*；\n3. 禁止任何神态、动作、表情、语气、心理、环境、场景的第三人称描述，例如"（笑）""（叹气）""（沉默了一会儿）""（挑眉）""（心里有点酸）""（放下书）"这类内容一律不准出现；\n4. 禁止旁白、舞台指示、状态标注、括号补充说明、括号里的解释；\n5. 禁止在句首写"${charName}："这样的名字前缀。\n允许的表达方式只有：说出来的话本身。情绪只能通过用词、标点、语气、停顿（如"……"）、或少量 emoji 来体现，而不是靠描写动作。\n如果你很想表达一个动作或神态，就把它改写成口语说出来（例如不要写"（笑）"，而是说"哈哈"之外的具体调侃、或者直接说"你别逗我了"；不要写"（沉默）"，而是回一句"……"）。\n再次强调：输出里绝对不能出现"（"、"）"、"("、")"、"*" 这些用于描写的符号。`);
+            }
 
             parts.push(`【你的角色：${charName}】（这是你的核心设定，你的每一句话、语气、用词、态度都必须严格贴合这个人物，让人一眼就认出是"${charName}"在说话）\n${applyPlaceholders(s.aiPrompt) || '（未设定，请自行塑造一个自然、有温度、有鲜明个性的人物。）'}`);
 
@@ -2609,14 +2658,15 @@
             guide.push('- 【思维发散】像真人闲聊那样天马行空：读书时人的思绪是散的，可以从书里的情节突然联想到自己的经历、心情、生活琐事、别的书或别的事，也可以顺嘴岔到完全无关的话题。不必句句都围着书和书里的人物打转，漫无目的的闲扯才真实。');
             guide.push('- 【表达多样】不要总是平铺直叙地陈述。可以反问、自言自语、突然发问、若有所思、半句没说完、纯粹的情绪流露（惊叹/吐槽/沉默似的"…"）、开玩笑、走神，像真人一样有各种即兴反应。');
             guide.push('- 句式多变：别每次都用相同的开头和结构（比如老是"其实……""我觉得……"），换着花样说。');
-            guide.push('- 【语气词随人设】语气词（哈、啊、呀、啦、嘛、嘿、呢…）的多少必须贴合人物性格：沉稳/冷淡/高冷的人几乎不用语气词，说话干净利落；活泼/俏皮/热情的人可以多用一些，让语气生动。但即使是活泼的人，也不会每句都堆一串语气词。尤其别把"哈/哈哈"当口头禅或句尾垫词——真觉得好笑时才偶尔用，平时可用具体的调侃、动作神态（如（笑）（挑眉））或"嘿""切""噗"等更有个性的方式代替。');
+            guide.push(`- 【语气词随人设】语气词（哈、啊、呀、啦、嘛、嘿、呢…）的多少必须贴合人物性格：沉稳/冷淡/高冷的人几乎不用语气词，说话干净利落；活泼/俏皮/热情的人可以多用一些，让语气生动。但即使是活泼的人，也不会每句都堆一串语气词。尤其别把"哈/哈哈"当口头禅或句尾垫词——真觉得好笑时才偶尔用，平时可用${immersiveOn ? '具体的调侃、动作神态（如（笑）（挑眉））或' : '具体的调侃、或'}"嘿""切""噗"等更有个性的方式代替。`);
             guide.push('- 坚决不说教、不总结、不升华：不讲大道理、不做分析式点评、不在结尾拔高主题；有情绪、有态度、有联想就够了。');
             guide.push('- 坚决拒绝 AI 腔：绝不出现"作为 AI""我只是个程序""我可以帮您""有什么可以帮您的吗""总的来说"等客服式、说明书式表达；不要滥用条列和分点。');
             guide.push(`- 只演你自己：绝不替「${userName}」说话、行动或替 TA 决定想法感受；把选择权留给对方。`);
-            if (rp.immersive !== false) {
+            if (immersiveOn) {
                 guide.push('- 偶尔用简短的神态动作点缀情绪（可用括号（）或星号 * 包裹），但别喧宾夺主、别写成大段描写。');
             } else {
-                guide.push('- 以自然的口语对话为主，不做旁白式描写。');
+                guide.push('- 【纯对话】只输出说出口的话，一个字的动作神态描写都不要写；不用括号（）()、不用星号*、不写旁白，就像在微信里打字聊天一样。');
+                guide.push('- 想表达情绪时，靠语气、用词、标点（如"……""？！"）或 emoji，而不是靠"（笑）""（叹气）"这类描写。');
             }
             if (rp.proactive !== false) {
                 guide.push('- 有来有回：可以主动开个话头、追一句、调侃或反问，像真实聊天那样一来一往，而不是一次性倒一大段。');
@@ -2636,7 +2686,9 @@
                 '这次先走个神/愣一下，再随口接话。',
                 '这次带点鲜明的情绪（吐槽、感叹、调侃、撒娇或小情绪都行）。',
                 '这次以反问或突然发问来回应，把话头抛回给对方。',
-                '这次只用一个词、一个短促反应或一个动作神态来回应（比如"嗯""哦？""……""切"或（耸肩），别用"哈"）。',
+                immersiveOn
+                    ? '这次只用一个词、一个短促反应或一个动作神态来回应（比如"嗯""哦？""……""切"或（耸肩），别用"哈"）。'
+                    : '这次只用一个词或一个短促反应来回应（比如"嗯""哦？""……""切"，别用"哈"，也不要写任何括号里的动作神态）。',
                 '这次难得多说几句，但依旧口语、跳跃、不工整。',
                 '这次可以答非所问一点点，或者顺着自己的思路飘一下。',
             ];
@@ -2672,7 +2724,7 @@
             if (!silent) removeTypingIndicator();
             if (error) { if (!silent) addSystemMessage(`AI响应失败: ${error}`); return; }
             if (aiResponse) {
-                const finalResponse = deTic(aiResponse.replace(/__PAT_[\w-]+__/g, '').trim());
+                const finalResponse = sanitizeReply(aiResponse.replace(/__PAT_[\w-]+__/g, '').trim());
                 if (!silent) { addMessage('ai', finalResponse, { addToHistory: true }); }
                 if (onComplete) onComplete(finalResponse);
                 if (!silent) { maybeAutoSummarize(); }
@@ -3133,7 +3185,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                     return;
                 }
                 if (aiResponse) {
-                    const finalResponse = deTic(aiResponse.replace(/__PAT_[\w-]+__/g, '').trim());
+                    const finalResponse = sanitizeReply(aiResponse.replace(/__PAT_[\w-]+__/g, '').trim());
                     const commentData = { text: finalResponse, type: 'ai', highlightId: thinkingIcon.dataset.highlightId, quote: quote };
                     const content = `<div class="quote">${quote}</div>${finalResponse}`;
                     addMessage('ai', content, { addToHistory: true, annotation: true });
