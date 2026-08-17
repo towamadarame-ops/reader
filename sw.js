@@ -14,7 +14,7 @@
  */
 
 // 改动代码后请把这里的版本号 +1，可确保所有旧缓存被清掉
-const SW_VERSION = 'v3';
+const SW_VERSION = 'v4';
 const CACHE_NAME = 'peiban-reader-' + SW_VERSION;
 
 // 需要预缓存的 App 外壳资源（单个失败不影响整体安装）
@@ -62,6 +62,13 @@ self.addEventListener('fetch', (event) => {
     let url;
     try { url = new URL(req.url); } catch (e) { return; }
     if (url.origin !== self.location.origin) return;
+
+    // 修复页永不拦截：它是把用户从"旧缓存打不开新版本"的死循环里救出来的唯一通道，
+    // 必须保证任何情况下都直接走网络拿最新文件。
+    if (/\/reset\.html$/i.test(url.pathname)) return;
+
+    // 带 __fresh / __probe 参数的请求也直接放行（修复页与诊断专用）
+    if (url.search.indexOf('__fresh=') !== -1 || url.search.indexOf('__probe=') !== -1) return;
 
     // 页面导航 / HTML：始终取最新，绕过 HTTP 缓存；只有断网时才用缓存兜底
     const isHTML = req.mode === 'navigate' ||

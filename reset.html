@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>修复工具 - 陪伴阅读</title>
+<!--
+  独立修复页。
+  为什么需要单独一个文件：
+    主页面 index.html 一旦被旧 Service Worker 缓存住，浏览器打开的永远是旧代码，
+    写在新版 index.html 里的自救逻辑（?reset=1）根本没机会执行 —— 死循环。
+    这个文件是全新路径，旧 Service Worker 的缓存里没有它，只能从网络取，
+    因此一定是最新版本，可以跳出那个死循环。
+
+  安全性：默认只注销 Service Worker + 删除 Cache Storage（网页缓存），
+  不会动 IndexedDB，所以你的书籍、聊天记录、设置都不会丢。
+  代码全部使用最保守的 ES5 写法，确保任何浏览器都能执行。
+-->
+<style>
+  html,body{margin:0;padding:0;background:#e0eee8;color:#333;
+    font:15px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;}
+  .wrap{max-width:520px;margin:0 auto;padding:22px 18px 60px;}
+  .card{background:#fff;border-radius:16px;padding:20px;margin-bottom:16px;
+    box-shadow:0 2px 10px rgba(0,0,0,.07);}
+  h1{font-size:19px;margin:0 0 6px;}
+  h2{font-size:15px;margin:0 0 10px;color:#555;}
+  .sub{color:#888;font-size:13px;margin:0 0 18px;}
+  .btn{display:block;width:100%;box-sizing:border-box;padding:14px;margin:0;border:none;
+    border-radius:12px;background:#a3ccc4;color:#fff;font-size:16px;font-weight:600;
+    cursor:pointer;font-family:inherit;text-align:center;text-decoration:none;}
+  .btn[disabled]{opacity:.55;}
+  .btn.ghost{background:#eee;color:#555;font-weight:400;font-size:14px;padding:11px;}
+  .btn.danger{background:#e57373;}
+  .sp{height:10px;}
+  .log{background:#fafafa;border:1px solid #eee;border-radius:10px;padding:12px;
+    font-size:12.5px;line-height:1.8;color:#555;white-space:pre-wrap;word-break:break-all;
+    max-height:260px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;}
+  .ok{color:#2e9e5b;}
+  .bad{color:#d9534f;}
+  .warn{background:#fff8e6;border:1px solid #f0d9a0;border-radius:10px;padding:11px 13px;
+    font-size:13px;color:#8a6d3b;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <h1>陪伴阅读 · 修复工具</h1>
+    <p class="sub">如果手机上打开的界面不对、或者更新后还是老样子，用这个页面修一下。</p>
+    <button class="btn" id="fixBtn">开始修复（保留我的数据）</button>
+    <div class="sp"></div>
+    <a class="btn ghost" id="backLink" href="./index.html">返回 App</a>
+  </div>
+
+  <div class="card">
+    <h2>诊断信息</h2>
+    <div class="log" id="log">正在检查…</div>
+  </div>
+
+  <div class="card">
+    <h2>还是不行？最后手段</h2>
+    <div class="warn">
+      下面这个按钮会连同 <b>书籍、聊天记录、设置</b> 一起全部删除，属于彻底重置。
+      只有在上面的修复无效时才用。
+    </div>
+    <div class="sp"></div>
+    <button class="btn danger" id="nukeBtn">彻底重置（会删除所有数据）</button>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var logEl = document.getElementById('log');
+  var lines = [];
+  function log(text, cls) {
+    lines.push(cls ? '<span class="' + cls + '">' + text + '</span>' : text);
+    logEl.innerHTML = lines.join('\n');
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function reset() { lines = []; logEl.innerHTML = ''; }
+
+  // 让每一步之间有可见的间隔，用户能看清进度
+  function delay(ms) {
+    return new Promise(function (r) { setTimeout(r, ms); });
+  }
+
+  /* ---------------- 诊断 ---------------- */
+  function diagnose() {
+    reset();
+    log('页面地址：' + location.href);
+    log('浏览器：' + navigator.userAgent);
+    log('Service Worker 支持：' + ('serviceWorker' in navigator ? '是' : '否'));
+    log('当前页面被 SW 控制：' + (navigator.serviceWorker && navigator.serviceWorker.controller ? '是' : '否'));
+
+    var jobs = [];
+
+    if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+      jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+        log('已注册的 Service Worker：' + rs.length + ' 个');
+        for (var i = 0; i < rs.length; i++) {
+          var sc = rs[i].scope;
+          var w = rs[i].active || rs[i].waiting || rs[i].installing;
+          log('  · 作用域 ' + sc + (w && w.scriptURL ? ('\n    脚本 ' + w.scriptURL) : ''));
+        }
+      }, function () { log('  读取 SW 列表失败', 'bad'); }));
+    }
+
+    if (window.caches && caches.keys) {
+      jobs.push(caches.keys().then(function (keys) {
+        log('缓存桶：' + (keys.length ? keys.join('、') : '（无）'));
+      }, function () { log('  读取缓存失败', 'bad'); }));
+    }
+
+    // 关键诊断：服务器上的版本 vs 浏览器实际用的版本
+    jobs.push(
+      fetch('./index.html?__probe=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { return r.text(); })
+        .then(function (t) {
+          var m = t.match(/name="app-build"\s+content="([^"]+)"/);
+          log('服务器上的 index.html 版本：' + (m ? m[1] : '（未标记，说明是旧版本）'),
+              m ? 'ok' : 'bad');
+          if (!m) {
+            log('  → 服务器上还是旧文件，请先确认新的 index.html 已经上传成功。', 'bad');
+          }
+        })
+        .catch(function (e) { log('探测服务器版本失败：' + e.message, 'bad'); })
+    );
+
+    return Promise.all(jobs).then(function () {
+      log('');
+      log('检查完毕。');
+    });
+  }
+
+  /* ---------------- 修复（保留数据） ---------------- */
+  function fix() {
+    var btn = document.getElementById('fixBtn');
+    btn.disabled = true;
+    btn.textContent = '修复中…';
+    reset();
+    log('开始修复，请不要关闭页面。');
+
+    var steps = Promise.resolve();
+
+    // 1) 注销所有 Service Worker
+    steps = steps.then(function () {
+      if (!('serviceWorker' in navigator) || !navigator.serviceWorker.getRegistrations) {
+        log('· 该浏览器不支持 Service Worker，跳过');
+        return;
+      }
+      return navigator.serviceWorker.getRegistrations().then(function (rs) {
+        if (!rs.length) { log('· 没有需要注销的 Service Worker'); return; }
+        return Promise.all(rs.map(function (r) {
+          return r.unregister().then(function (ok) {
+            log('· 注销 ' + r.scope + ' → ' + (ok ? '成功' : '失败'), ok ? 'ok' : 'bad');
+          });
+        }));
+      });
+    });
+
+    // 2) 删除所有 Cache Storage
+    steps = steps.then(function () {
+      if (!(window.caches && caches.keys)) { log('· 该浏览器不支持 Cache Storage，跳过'); return; }
+      return caches.keys().then(function (keys) {
+        if (!keys.length) { log('· 没有需要清除的缓存'); return; }
+        return Promise.all(keys.map(function (k) {
+          return caches.delete(k).then(function (ok) {
+            log('· 删除缓存 ' + k + ' → ' + (ok ? '成功' : '失败'), ok ? 'ok' : 'bad');
+          });
+        }));
+      });
+    });
+
+    steps = steps.then(function () { return delay(400); });
+
+    steps = steps.then(function () {
+      log('');
+      log('修复完成，你的书籍和聊天记录都还在。', 'ok');
+      log('3 秒后自动打开 App…');
+      btn.textContent = '修复完成';
+      setTimeout(function () {
+        // 带时间戳，确保这一次一定从网络取最新页面
+        location.replace('./index.html?__fresh=' + Date.now());
+      }, 3000);
+    });
+
+    steps.catch(function (e) {
+      log('');
+      log('修复过程出错：' + (e && e.message ? e.message : e), 'bad');
+      log('请改用「彻底重置」，或在 Chrome 里手动清除本站数据。');
+      btn.disabled = false;
+      btn.textContent = '重试修复';
+    });
+  }
+
+  /* ---------------- 彻底重置（会删数据） ---------------- */
+  function nuke() {
+    if (!confirm('确定要彻底重置吗？\n\n你导入的所有书籍、聊天记录、角色设定都会被删除，且无法恢复。')) return;
+    if (!confirm('再确认一次：所有数据都会丢失，真的继续吗？')) return;
+
+    var btn = document.getElementById('nukeBtn');
+    btn.disabled = true;
+    btn.textContent = '重置中…';
+    reset();
+    log('开始彻底重置…');
+
+    var steps = Promise.resolve();
+
+    steps = steps.then(function () {
+      if (!('serviceWorker' in navigator) || !navigator.serviceWorker.getRegistrations) return;
+      return navigator.serviceWorker.getRegistrations().then(function (rs) {
+        return Promise.all(rs.map(function (r) { return r.unregister(); }));
+      }).then(function () { log('· Service Worker 已注销', 'ok'); });
+    });
+
+    steps = steps.then(function () {
+      if (!(window.caches && caches.keys)) return;
+      return caches.keys().then(function (keys) {
+        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      }).then(function () { log('· 网页缓存已清除', 'ok'); });
+    });
+
+    steps = steps.then(function () {
+      try { localStorage.clear(); sessionStorage.clear(); log('· 本地存储已清除', 'ok'); } catch (e) {}
+    });
+
+    // 删除 IndexedDB（书籍 / 聊天 / 设置都在这里）
+    steps = steps.then(function () {
+      if (!window.indexedDB) return;
+      var known = ['localforage', 'peiban-reader', 'keyvaluepairs'];
+      var listing = (indexedDB.databases)
+        ? indexedDB.databases().then(function (ds) {
+            return ds.map(function (d) { return d.name; }).filter(Boolean);
+          }).catch(function () { return known; })
+        : Promise.resolve(known);
+
+      return listing.then(function (names) {
+        if (!names.length) { log('· 没有找到数据库'); return; }
+        return Promise.all(names.map(function (n) {
+          return new Promise(function (done) {
+            var req = indexedDB.deleteDatabase(n);
+            req.onsuccess = function () { log('· 数据库 ' + n + ' 已删除', 'ok'); done(); };
+            req.onerror = function () { log('· 数据库 ' + n + ' 删除失败', 'bad'); done(); };
+            req.onblocked = function () { log('· 数据库 ' + n + ' 被占用（关掉其他标签页后重试）', 'bad'); done(); };
+            setTimeout(done, 3000); // 兜底，避免卡住
+          });
+        }));
+      });
+    });
+
+    steps = steps.then(function () { return delay(400); });
+
+    steps = steps.then(function () {
+      log('');
+      log('彻底重置完成。', 'ok');
+      log('3 秒后重新打开 App（会是全新状态）…');
+      btn.textContent = '重置完成';
+      setTimeout(function () {
+        location.replace('./index.html?__fresh=' + Date.now());
+      }, 3000);
+    });
+
+    steps.catch(function (e) {
+      log('重置出错：' + (e && e.message ? e.message : e), 'bad');
+      btn.disabled = false;
+      btn.textContent = '重试';
+    });
+  }
+
+  document.getElementById('fixBtn').addEventListener('click', fix);
+  document.getElementById('nukeBtn').addEventListener('click', nuke);
+
+  diagnose();
+})();
+</script>
+</body>
+</html>

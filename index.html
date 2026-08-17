@@ -4,7 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>陪伴阅读</title>
-    
+
+    <!-- 版本标记：修复页(reset.html)靠它判断浏览器加载的到底是新版还是缓存里的旧版。
+         每次改完代码上传前，把这里的日期/序号往后改一位即可。 -->
+    <meta name="app-build" content="2026-08-17-a">
+
     <!-- PWA 配置 - iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -110,6 +114,13 @@
 
             // 存储库没加载成功时，App 必然全盘失效，提前给出明确提示
             document.addEventListener('DOMContentLoaded', function () {
+                // 把版本号写到设置页底部（放在这个独立块里，主脚本出错也照样显示）
+                try {
+                    var meta = document.querySelector('meta[name="app-build"]');
+                    var slot = document.getElementById('build-stamp');
+                    if (meta && slot) slot.textContent = meta.getAttribute('content');
+                } catch (e) {}
+
                 if (typeof window.localforage === 'undefined') {
                     showFatal('存储组件加载失败，数据无法读写',
                         '请确认 localforage.min.js 已和 index.html 一起上传到同一目录；' +
@@ -1026,6 +1037,11 @@
                         <div class="form-item">
                             <label>聊天记录</label>
                             <button id="clear-chat-btn" class="inline-btn danger-btn">清除聊天记录</button>
+                        </div>
+                        <!-- 版本号：用来确认手机上加载的到底是不是最新代码 -->
+                        <div class="form-item" style="display:block;text-align:center;color:#aaa;font-size:12px;padding-top:6px;">
+                            版本 <span id="build-stamp">-</span>　·　
+                            <a href="./reset.html" style="color:#a3ccc4;text-decoration:none;">遇到问题？打开修复工具</a>
                         </div>
                     </div>
                 </div>
