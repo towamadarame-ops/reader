@@ -7,7 +7,7 @@
 
     <!-- 版本标记：修复页(reset.html)靠它判断浏览器加载的到底是新版还是缓存里的旧版。
          每次改完代码上传前，把这里的日期/序号往后改一位即可。 -->
-    <meta name="app-build" content="2026-08-17-e">
+    <meta name="app-build" content="2026-08-17-f">
 
     <!-- PWA 配置 - iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -254,6 +254,7 @@
         .reader-content-wrapper.flip-mode .para-spacer { display: none; }
 
         .reader-content { 
+            font-family: var(--reader-font-family, var(--font-family)); 
             line-height: var(--reader-line-height); 
             font-size: var(--reader-font-size); 
             text-align: justify; 
@@ -986,6 +987,16 @@
                                 <div class="form-item"><label>伴侣注释颜色</label><input type="color" id="reader-comment-color"></div>
                                 <div class="form-item"><label>用户注释颜色</label><input type="color" id="reader-user-comment-color"></div>
                                 <div class="form-item">
+                                    <label>字体</label>
+                                    <select id="reader-font-family">
+                                        <option value="hei">黑体（推荐阅读）</option>
+                                        <option value="song">宋体</option>
+                                        <option value="kai">楷体</option>
+                                        <option value="youhei">方正悠黑</option>
+                                        <option value="system">跟随系统</option>
+                                    </select>
+                                </div>
+                                <div class="form-item">
                                     <label>字体大小</label>
                                     <div class="range-control">
                                         <input type="range" id="reader-font-size" min="12" max="24" step="1">
@@ -1387,6 +1398,7 @@
             readerCommentColor: document.getElementById('reader-comment-color'),
             readerUserCommentColor: document.getElementById('reader-user-comment-color'),
             readerFontSize: document.getElementById('reader-font-size'),
+            readerFontFamily: document.getElementById('reader-font-family'),
             fontSizeValue: document.getElementById('font-size-value'),
             readerLineHeight: document.getElementById('reader-line-height'),
             lineHeightValue: document.getElementById('line-height-value'),
@@ -1496,6 +1508,7 @@
                     readerBg: '#fdfcfa',
                     readerFontColor: '#333333',
                     readerFontSize: '17',
+                    readerFontFamily: 'hei',
                     readerLineHeight: '1.8',
                     readerPadding: '20',
                     readerCommentColor: '#a3ccc4',
@@ -2221,7 +2234,9 @@
                 const prevLineHeight = state.settings.theme.readerLineHeight;
                 const prevPadding = state.settings.theme.readerPadding;
                 const prevPagination = state.settings.reading.paginationMode;
+                const prevFontFamily = state.settings.theme.readerFontFamily;
                 state.settings.theme.readerFontSize = dom.readerFontSize.value;
+                state.settings.theme.readerFontFamily = (dom.readerFontFamily && dom.readerFontFamily.value) || 'hei';
                 state.settings.theme.readerLineHeight = dom.readerLineHeight.value;
                 state.settings.theme.readerPadding = dom.readerPadding.value;
                 state.settings.reading.bookEncoding = dom.bookEncoding.value;
@@ -2231,7 +2246,8 @@
                 const layoutChanged = prevFontSize !== state.settings.theme.readerFontSize
                     || prevLineHeight !== state.settings.theme.readerLineHeight
                     || prevPadding !== state.settings.theme.readerPadding
-                    || prevPagination !== state.settings.reading.paginationMode;
+                    || prevPagination !== state.settings.reading.paginationMode
+                    || prevFontFamily !== state.settings.theme.readerFontFamily;
                 
                 // 把当前编辑同步回激活的角色卡 / 身份，并各自持久化
                 syncSettingsToActiveCharacter();
@@ -2477,6 +2493,7 @@
             dom.readerUserCommentColor.value = state.settings.theme.readerUserCommentColor;
             dom.readerFontSize.value = state.settings.theme.readerFontSize;
             dom.fontSizeValue.textContent = state.settings.theme.readerFontSize;
+            if (dom.readerFontFamily) dom.readerFontFamily.value = state.settings.theme.readerFontFamily || 'hei';
             dom.readerLineHeight.value = state.settings.theme.readerLineHeight || 1.8;
             dom.lineHeightValue.textContent = state.settings.theme.readerLineHeight || 1.8;
             dom.readerPadding.value = state.settings.theme.readerPadding || 20;
@@ -2488,6 +2505,15 @@
             
             root.style.setProperty('--reader-bg', state.settings.theme.readerBgImage !== 'none' ? `url(${state.settings.theme.readerBgImage})` : state.settings.theme.readerBg);
             root.style.setProperty('--reader-font-color', state.settings.theme.readerFontColor);
+            const READER_FONT_STACKS = {
+                hei: '-apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif',
+                song: '"Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif',
+                kai: '"Kaiti SC", "STKaiti", "KaiTi", "BiauKai", serif',
+                youhei: '"FZYouHeiS", "方正悠黑", "FZYouHeiS-R-GB", sans-serif',
+                system: 'var(--font-family)',
+            };
+            const chosenFont = state.settings.theme.readerFontFamily || 'hei';
+            root.style.setProperty('--reader-font-family', READER_FONT_STACKS[chosenFont] || READER_FONT_STACKS.hei);
             root.style.setProperty('--reader-font-size', `${state.settings.theme.readerFontSize}px`);
             root.style.setProperty('--reader-line-height', state.settings.theme.readerLineHeight || 1.8);
             root.style.setProperty('--reader-padding', `${state.settings.theme.readerPadding || 20}px`);
