@@ -134,6 +134,10 @@
             break-inside: auto; 
         }
 
+        /* 虚拟化渲染的上下占位条：撑出未渲染部分的高度，让滚动条长度接近真实书长 */
+        .para-spacer { width: 100%; flex-shrink: 0; pointer-events: none; }
+        .reader-content-wrapper.flip-mode .para-spacer { display: none; }
+
         .reader-content { 
             line-height: var(--reader-line-height); 
             font-size: var(--reader-font-size); 
@@ -1390,6 +1394,15 @@
                 preventFlipOnce: false, // NEW: Flag to prevent flip on selection interaction
                 isNavMenuVisible: false, // 章节导航面板是否显示
                 isDraggingSlider: false, // 是否正在拖动章节滑块
+                // ===== 段落虚拟化渲染（避免整本书一次性建 DOM 而卡死/黑屏）=====
+                winStart: 0,        // 当前渲染窗口起始段落下标（含）
+                winEnd: 0,          // 当前渲染窗口结束段落下标（不含）
+                curPara: 0,         // 视口内最靠前的段落下标（进度与章节判断的唯一依据）
+                avgParaH: 0,        // 段落平均高度，用于上下占位条估算（按当前字号缓存）
+                visibleParas: null, // Set：当前与视口相交的段落下标
+                paraObserver: null, // IntersectionObserver
+                progressRaf: 0,     // 进度刷新的 rAF 句柄，用于节流
+                rendering: false,   // 渲染中标记，避免滚动回调重入
             },
             longPressTimer: null,
             selection: {
@@ -1408,6 +1421,334 @@
 
         const getActiveBook = () => state.activeBookId ? state.books[state.activeBookId] : null;
 
+        // ===================================================================
+        // 段落虚拟化渲染
+        // 以前的实现会把整本书（几万行）一次性渲染成 <p>，导入时必然长时间卡死，
+        // 翻页模式下还要对整本书做多列排版，直接内存爆掉黑屏。
+        // 这里改成只渲染「当前阅读位置附近的一段窗口」，上下用占位条撑出总高度。
+        // ===================================================================
+        const PARA_CHUNK = 150;      // 每次向前/向后追加的段落数
+        const PARA_WINDOW = 450;     // 初始渲染的段落数
+        const PARA_MAX_LIVE = 900;   // DOM 中最多保留的段落数，超出则从远端裁剪
+        const FLIP_SEGMENT = 300;    // 翻页模式下每个分段的段落数（多列排版只作用于一段）
+
+        const isFlipMode = () => state.settings.reading.paginationMode === 'flip';
+        const getParaTotal = () => { const b = getActiveBook(); return b && b.paragraphs ? b.paragraphs.length : 0; };
+
+        // 上下占位条：撑起未渲染部分的高度，让滚动条长度与真实书长一致
+        let topSpacerEl = null, bottomSpacerEl = null;
+        const getSpacers = () => {
+            // 优先复用已经挂在 DOM 里的占位条，避免引用被意外替换
+            if (!topSpacerEl || !topSpacerEl.isConnected) {
+                topSpacerEl = dom.readerContent.querySelector('.para-spacer[data-spacer="top"]');
+            }
+            if (!bottomSpacerEl || !bottomSpacerEl.isConnected) {
+                bottomSpacerEl = dom.readerContent.querySelector('.para-spacer[data-spacer="bottom"]');
+            }
+            if (!topSpacerEl) {
+                topSpacerEl = document.createElement('div');
+                topSpacerEl.className = 'para-spacer';
+                topSpacerEl.dataset.spacer = 'top';
+            }
+            if (!bottomSpacerEl) {
+                bottomSpacerEl = document.createElement('div');
+                bottomSpacerEl.className = 'para-spacer';
+                bottomSpacerEl.dataset.spacer = 'bottom';
+            }
+            return { top: topSpacerEl, bottom: bottomSpacerEl };
+        };
+        const spacerH = (el) => parseFloat(el.style.height) || 0;
+
+        // 估算单段落高度（只在字号/行距变化后重新测量一次，避免占位高度抖动）
+        const getAvgParaHeight = () => {
+            if (state.reading.avgParaH > 0) return state.reading.avgParaH;
+            const ps = dom.readerContent.querySelectorAll('p');
+            let sum = 0, n = 0;
+            for (let i = 0; i < ps.length && n < 40; i++) {
+                const h = ps[i].offsetHeight;
+                if (h > 0) { sum += h; n++; }
+            }
+            const fontSize = parseFloat(state.settings.theme.readerFontSize) || 17;
+            const lineH = parseFloat(state.settings.theme.readerLineHeight) || 1.8;
+            const fallback = fontSize * lineH * 2.2; // 约两行的高度
+            state.reading.avgParaH = n > 0 ? Math.max(8, sum / n) : fallback;
+            return state.reading.avgParaH;
+        };
+        const resetAvgParaHeight = () => { state.reading.avgParaH = 0; };
+
+        // 单个段落元素的构建（含批注高亮），从原 displayBookContent 中抽出
+        const buildParagraphEl = (book, index) => {
+            const pEl = document.createElement('p');
+            pEl.dataset.paraId = index;
+            pEl.id = `para-id-${index}`;
+            const paraContent = (book.paragraphs[index] || '').trim() || ' ';
+            const comments = book.comments ? book.comments[index] : null;
+            if (comments && comments.length > 0) {
+                const highlights = [];
+                comments.forEach(comment => {
+                    if (comment.quote) {
+                        const startIndex = paraContent.indexOf(comment.quote);
+                        if (startIndex !== -1) { highlights.push({ start: startIndex, end: startIndex + comment.quote.length, comment }); }
+                    }
+                });
+                highlights.sort((a, b) => a.start - b.start);
+                const uniqueHighlights = [];
+                let lastEnd = -1;
+                for (const h of highlights) {
+                    if (h.start >= lastEnd) { uniqueHighlights.push(h); lastEnd = h.end; }
+                }
+                const contentSpan = document.createElement('span');
+                let lastIndex = 0;
+                uniqueHighlights.forEach(h => {
+                    if (h.start > lastIndex) { contentSpan.appendChild(document.createTextNode(paraContent.substring(lastIndex, h.start))); }
+                    const highlightSpan = document.createElement('span');
+                    highlightSpan.className = h.comment.type === 'user' ? 'user-highlight' : 'comment-highlight';
+                    highlightSpan.dataset.highlightId = h.comment.highlightId;
+                    highlightSpan.textContent = paraContent.substring(h.start, h.end);
+                    contentSpan.appendChild(highlightSpan);
+                    lastIndex = h.end;
+                });
+                if (lastIndex < paraContent.length) { contentSpan.appendChild(document.createTextNode(paraContent.substring(lastIndex))); }
+                pEl.appendChild(contentSpan);
+                renderCommentIcons(pEl, comments);
+            } else {
+                const span = document.createElement('span');
+                span.textContent = paraContent;
+                pEl.appendChild(span);
+            }
+            return pEl;
+        };
+
+        // 用 IntersectionObserver 跟踪可见段落，得到 curPara。
+        // 这样进度与章节判断完全不需要 getBoundingClientRect / offsetTop，滚动时零重排。
+        const ensureParaObserver = () => {
+            if (state.reading.paraObserver) return state.reading.paraObserver;
+            state.reading.visibleParas = new Set();
+            state.reading.paraObserver = new IntersectionObserver((entries) => {
+                const set = state.reading.visibleParas;
+                entries.forEach(en => {
+                    const id = parseInt(en.target.dataset.paraId, 10);
+                    if (Number.isNaN(id)) return;
+                    if (en.isIntersecting) set.add(id); else set.delete(id);
+                });
+                if (set.size) {
+                    let min = Infinity;
+                    set.forEach(v => { if (v < min) min = v; });
+                    if (min !== Infinity) state.reading.curPara = min;
+                }
+                scheduleProgressUpdate();
+            }, { root: dom.readerContentWrapper, threshold: 0 });
+            return state.reading.paraObserver;
+        };
+        const observePara = (el) => { try { ensureParaObserver().observe(el); } catch (e) {} };
+        const unobservePara = (el) => {
+            try { if (state.reading.paraObserver) state.reading.paraObserver.unobserve(el); } catch (e) {}
+            const id = parseInt(el.dataset.paraId, 10);
+            if (state.reading.visibleParas) state.reading.visibleParas.delete(id);
+        };
+
+        // 渲染指定窗口 [start, end)，并把占位条调整到对应高度
+        const renderParaWindow = (start, end) => {
+            const book = getActiveBook();
+            if (!book) return;
+            const total = book.paragraphs.length;
+            start = Math.max(0, Math.min(start, Math.max(0, total - 1)));
+            end = Math.max(start + 1, Math.min(end, total));
+
+            state.reading.rendering = true;
+            if (state.reading.visibleParas) state.reading.visibleParas.clear();
+            if (state.reading.paraObserver) { state.reading.paraObserver.disconnect(); state.reading.paraObserver = null; }
+
+            const { top, bottom } = getSpacers();
+            dom.readerContent.innerHTML = '';
+            const frag = document.createDocumentFragment();
+            for (let i = start; i < end; i++) frag.appendChild(buildParagraphEl(book, i));
+
+            const flip = isFlipMode();
+            top.style.height = '0px';
+            bottom.style.height = '0px';
+            dom.readerContent.appendChild(top);
+            dom.readerContent.appendChild(frag);
+            dom.readerContent.appendChild(bottom);
+
+            state.reading.winStart = start;
+            state.reading.winEnd = end;
+
+            // 翻页模式是多列排版，占位条会产生空白列，因此不使用占位条（改为按分段翻页）
+            if (!flip) {
+                const avg = getAvgParaHeight();
+                top.style.height = `${Math.round(start * avg)}px`;
+                bottom.style.height = `${Math.round((total - end) * avg)}px`;
+            }
+
+            dom.readerContent.querySelectorAll('p').forEach(observePara);
+            state.reading.rendering = false;
+        };
+
+        // 向后追加一批段落（滚动模式）
+        const growParaWindowDown = () => {
+            const book = getActiveBook();
+            if (!book || state.reading.rendering) return false;
+            const total = book.paragraphs.length;
+            if (state.reading.winEnd >= total) return false;
+            state.reading.rendering = true;
+            const { top, bottom } = getSpacers();
+            const from = state.reading.winEnd;
+            const to = Math.min(total, from + PARA_CHUNK);
+            const frag = document.createDocumentFragment();
+            const added = [];
+            for (let i = from; i < to; i++) { const el = buildParagraphEl(book, i); added.push(el); frag.appendChild(el); }
+            dom.readerContent.insertBefore(frag, bottom);
+            state.reading.winEnd = to;
+            const avg = getAvgParaHeight();
+            bottom.style.height = `${Math.round((total - to) * avg)}px`;
+            added.forEach(observePara);
+
+            // 超过上限则从顶部裁剪，并把裁掉的「实测高度」补进上占位条 —— 位置零漂移
+            let live = state.reading.winEnd - state.reading.winStart;
+            if (live > PARA_MAX_LIVE) {
+                const cut = Math.min(PARA_CHUNK, live - PARA_MAX_LIVE + PARA_CHUNK);
+                // 先一次性量完再统一删除：读写交错会反复触发强制重排
+                const doomed = [];
+                for (let i = 0; i < cut; i++) {
+                    const el = document.getElementById(`para-id-${state.reading.winStart + i}`);
+                    if (el) doomed.push(el);
+                }
+                let removedH = 0;
+                doomed.forEach(el => { removedH += el.offsetHeight + (parseFloat(getComputedStyle(el).marginBottom) || 0); });
+                doomed.forEach(el => { unobservePara(el); el.remove(); });
+                state.reading.winStart += cut;
+                top.style.height = `${Math.round(spacerH(top) + removedH)}px`;
+            }
+            state.reading.rendering = false;
+            return true;
+        };
+
+        // 向前追加一批段落（滚动模式）
+        const growParaWindowUp = () => {
+            const book = getActiveBook();
+            if (!book || state.reading.rendering) return false;
+            if (state.reading.winStart <= 0) return false;
+            state.reading.rendering = true;
+            const wrapper = dom.readerContentWrapper;
+            const { top, bottom } = getSpacers();
+            const to = state.reading.winStart;
+            const from = Math.max(0, to - PARA_CHUNK);
+            const frag = document.createDocumentFragment();
+            const added = [];
+            for (let i = from; i < to; i++) { const el = buildParagraphEl(book, i); added.push(el); frag.appendChild(el); }
+            dom.readerContent.insertBefore(frag, top.nextSibling);
+            state.reading.winStart = from;
+
+            // 用新插入内容的实测高度去抵扣上占位条，保证视口内容不跳动
+            let addedH = 0;
+            added.forEach(el => { addedH += el.offsetHeight + (parseFloat(getComputedStyle(el).marginBottom) || 0); });
+            const want = spacerH(top) - addedH;
+            if (want >= 0) {
+                top.style.height = `${Math.round(want)}px`;
+            } else {
+                top.style.height = '0px';
+                wrapper.scrollTop += Math.round(-want); // 估算不足时补偿滚动位置
+            }
+            added.forEach(observePara);
+
+            let live = state.reading.winEnd - state.reading.winStart;
+            if (live > PARA_MAX_LIVE) {
+                const total = book.paragraphs.length;
+                const cut = Math.min(PARA_CHUNK, live - PARA_MAX_LIVE + PARA_CHUNK);
+                for (let i = 0; i < cut; i++) {
+                    const el = document.getElementById(`para-id-${state.reading.winEnd - 1 - i}`);
+                    if (!el) continue;
+                    unobservePara(el);
+                    el.remove();
+                }
+                state.reading.winEnd -= cut;
+                const avg = getAvgParaHeight();
+                bottom.style.height = `${Math.round((total - state.reading.winEnd) * avg)}px`;
+            }
+            state.reading.rendering = false;
+            return true;
+        };
+
+        // 保证某个段落已经在 DOM 中（目录跳转、搜索跳转、进度恢复都要用）
+        const ensureParaRendered = (index) => {
+            const total = getParaTotal();
+            if (!total) return false;
+            const idx = Math.max(0, Math.min(index, total - 1));
+            if (idx >= state.reading.winStart && idx < state.reading.winEnd && document.getElementById(`para-id-${idx}`)) return true;
+            if (isFlipMode()) {
+                const segStart = Math.floor(idx / FLIP_SEGMENT) * FLIP_SEGMENT;
+                renderParaWindow(segStart, segStart + FLIP_SEGMENT);
+            } else {
+                const start = Math.max(0, idx - Math.floor(PARA_WINDOW / 3));
+                renderParaWindow(start, start + PARA_WINDOW);
+            }
+            state.reading.curPara = idx;
+            return !!document.getElementById(`para-id-${idx}`);
+        };
+
+        // 滚动/翻页到指定段落
+        const scrollToPara = (index, { smooth = false } = {}) => {
+            if (!ensureParaRendered(index)) return false;
+            const el = document.getElementById(`para-id-${index}`);
+            if (!el) return false;
+            if (isFlipMode()) {
+                el.scrollIntoView({ block: 'nearest', inline: 'start' });
+            } else {
+                const target = Math.max(0, el.offsetTop - 2);
+                if (smooth) dom.readerContentWrapper.scrollTo({ top: target, behavior: 'smooth' });
+                else dom.readerContentWrapper.scrollTop = target;
+            }
+            state.reading.curPara = index;
+            scheduleProgressUpdate();
+            return true;
+        };
+
+        // 翻页模式：切换到上一段 / 下一段（多列排版只对当前分段生效）
+        const flipSegmentShift = (dir) => {
+            const total = getParaTotal();
+            if (!total) return false;
+            const curSeg = Math.floor(state.reading.winStart / FLIP_SEGMENT);
+            const nextSeg = curSeg + dir;
+            const maxSeg = Math.floor((total - 1) / FLIP_SEGMENT);
+            if (nextSeg < 0 || nextSeg > maxSeg) return false;
+            const start = nextSeg * FLIP_SEGMENT;
+            renderParaWindow(start, start + FLIP_SEGMENT);
+            applyPaginationMode();
+            const wrapper = dom.readerContentWrapper;
+            if (dir > 0) {
+                wrapper.scrollLeft = 0;
+                state.reading.curPara = start;
+            } else {
+                wrapper.scrollLeft = wrapper.scrollWidth; // 落到上一段的最后一页
+                state.reading.curPara = Math.min(total - 1, start + FLIP_SEGMENT - 1);
+            }
+            scheduleProgressUpdate();
+            return true;
+        };
+
+
+        // 二分查找：某个段落下标属于哪一章（纯计算，无任何 DOM 测量）
+        const findChapterIndexByPara = (toc, paraIndex) => {
+            if (!Array.isArray(toc) || toc.length === 0) return -1;
+            let lo = 0, hi = toc.length - 1, ans = 0;
+            while (lo <= hi) {
+                const mid = (lo + hi) >> 1;
+                if (toc[mid].paraIndex <= paraIndex) { ans = mid; lo = mid + 1; }
+                else { hi = mid - 1; }
+            }
+            return ans;
+        };
+
+        // 进度刷新用 rAF 节流：滚动事件每帧最多算一次，避免高频重排
+        const scheduleProgressUpdate = () => {
+            if (state.reading.progressRaf) return;
+            state.reading.progressRaf = requestAnimationFrame(() => {
+                state.reading.progressRaf = 0;
+                updateReadingProgress();
+            });
+        };
+
         const updateReadingProgress = () => {
             const activeBook = getActiveBook();
             if (!activeBook) {
@@ -1418,51 +1759,27 @@
                 return;
             }
 
-            let progress = 0;
-            const mode = state.settings.reading.paginationMode;
-
-            if (mode === 'flip') {
-                const { scrollLeft, scrollWidth, clientWidth } = dom.readerContentWrapper;
-                const totalScrollWidth = scrollWidth - clientWidth;
-                progress = totalScrollWidth > 0 ? Math.min(100, Math.max(0, (scrollLeft / totalScrollWidth) * 100)) : 0;
-            } else {
-                const { scrollTop, scrollHeight, clientHeight } = dom.readerContentWrapper;
-                const totalScrollHeight = scrollHeight - clientHeight;
-                progress = totalScrollHeight > 0 ? Math.min(100, Math.max(0, (scrollTop / totalScrollHeight) * 100)) : 0;
+            // 进度改为按「当前段落下标 / 总段落数」计算：
+            // 虚拟化后 scrollHeight 只代表窗口内容，用像素算进度已不准确，
+            // 而且按下标算完全不需要读取布局，滚动时不会再触发强制重排。
+            const total = activeBook.paragraphs.length || 1;
+            const cur = Math.max(0, Math.min(state.reading.curPara || 0, total - 1));
+            let progress = total > 1 ? (cur / (total - 1)) * 100 : 100;
+            if (state.reading.winEnd >= total) {
+                const w = dom.readerContentWrapper;
+                const atEnd = isFlipMode()
+                    ? (w.scrollLeft + w.clientWidth >= w.scrollWidth - 4)
+                    : (w.scrollTop + w.clientHeight >= w.scrollHeight - 4);
+                if (atEnd) progress = 100;
             }
-            
+            progress = Math.min(100, Math.max(0, progress));
+
             dom.readerProgressFill.style.width = `${progress}%`;
             dom.progressInfo.textContent = `${Math.round(progress)}%`;
-            
-            let currentChapterTitle = '书籍开头';
-            
-            if (mode === 'flip') {
-                 // For flip mode, detecting visible chapter is harder without heavy calculation.
-                 // Let's use getBoundingClientRect for Flip mode chapter detection.
-                 const containerRect = dom.readerContentWrapper.getBoundingClientRect();
-                 for (let i = activeBook.toc.length - 1; i >= 0; i--) {
-                     const tocItem = activeBook.toc[i];
-                     const anchor = document.getElementById(`para-id-${tocItem.paraIndex}`);
-                     if (anchor) {
-                         const rect = anchor.getBoundingClientRect();
-                         // In horizontal scroll, we check if rect.left <= container.right
-                         if (rect.left < containerRect.right) {
-                             currentChapterTitle = tocItem.title;
-                             break;
-                         }
-                     }
-                 }
-            } else {
-                const { scrollTop, clientHeight } = dom.readerContentWrapper;
-                for (let i = activeBook.toc.length - 1; i >= 0; i--) {
-                    const tocItem = activeBook.toc[i];
-                    const anchor = document.getElementById(`para-id-${tocItem.paraIndex}`);
-                    if (anchor && scrollTop >= anchor.offsetTop - clientHeight / 2) {
-                        currentChapterTitle = tocItem.title;
-                        break;
-                    }
-                }
-            }
+
+            const toc = activeBook.toc || [];
+            const chapIdx = findChapterIndexByPara(toc, cur);
+            const currentChapterTitle = chapIdx >= 0 ? toc[chapIdx].title : '书籍开头';
 
             const prevChapterTitle = activeBook.currentChapter;
             activeBook.currentChapter = currentChapterTitle;
@@ -1472,9 +1789,8 @@
 
             // 章节切换检测：向前进入新章节时，触发「读完一章的小互动」与「共读心情」
             if (prevChapterTitle && prevChapterTitle !== currentChapterTitle && typeof triggerChapterEndQuestion === 'function') {
-                const toc = activeBook.toc || [];
                 const prevIdx = toc.findIndex(t => t.title === prevChapterTitle);
-                const curIdx = toc.findIndex(t => t.title === currentChapterTitle);
+                const curIdx = chapIdx;
                 if (curIdx > prevIdx) { // 只在向后阅读推进时触发，避免往回翻打扰
                     triggerChapterEndQuestion(prevChapterTitle);
                     setTimeout(() => triggerReadingMood(currentChapterTitle), 1200);
@@ -1502,7 +1818,7 @@
         const getCurrentChapterIndex = () => {
             const activeBook = getActiveBook();
             if (!activeBook || !Array.isArray(activeBook.toc) || activeBook.toc.length === 0) return 0;
-            const idx = activeBook.toc.findIndex(t => t.title === activeBook.currentChapter);
+            const idx = findChapterIndexByPara(activeBook.toc, state.reading.curPara || 0);
             return idx < 0 ? 0 : idx;
         };
 
@@ -1513,14 +1829,8 @@
             const clamped = Math.max(0, Math.min(activeBook.toc.length - 1, idx));
             const item = activeBook.toc[clamped];
             if (!item) return;
-            const anchor = document.getElementById(`para-id-${item.paraIndex}`);
-            if (anchor) {
-                if (state.settings.reading.paginationMode === 'flip') {
-                    anchor.scrollIntoView({ block: 'nearest', inline: 'start' });
-                } else {
-                    anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            }
+            // 先把目标段落所在的窗口渲染出来，再定位（跨越几千段也是瞬时的）
+            scrollToPara(item.paraIndex);
             // 主动更新一次，让面板信息立即反映跳转结果
             setTimeout(updateReadingProgress, 60);
         };
@@ -1603,11 +1913,9 @@
                     const activeBook = getActiveBook();
                     if(activeBook) {
                         applyPaginationMode(); // Ensure correct mode
-                        if (state.settings.reading.paginationMode === 'flip') {
-                             dom.readerContentWrapper.scrollLeft = activeBook.lastScrollLeft || 0;
-                        } else {
-                             dom.readerContentWrapper.scrollTop = activeBook.lastScrollTop || 0;
-                        }
+                        // 虚拟化渲染后按「段落下标」恢复位置，比像素更可靠（改字号也不会跑偏）
+                        if (state.reading.winEnd > state.reading.winStart) recalibrateSpacers();
+                        else scrollToPara(state.reading.curPara || activeBook.lastParaIndex || 0);
                         updateReadingProgress();
                     }
                 }, 100);
@@ -1766,12 +2074,21 @@
                 state.settings.theme.readerFontColor = dom.readerFontColor.value;
                 state.settings.theme.readerCommentColor = dom.readerCommentColor.value;
                 state.settings.theme.readerUserCommentColor = dom.readerUserCommentColor.value;
+                const prevFontSize = state.settings.theme.readerFontSize;
+                const prevLineHeight = state.settings.theme.readerLineHeight;
+                const prevPadding = state.settings.theme.readerPadding;
+                const prevPagination = state.settings.reading.paginationMode;
                 state.settings.theme.readerFontSize = dom.readerFontSize.value;
                 state.settings.theme.readerLineHeight = dom.readerLineHeight.value;
                 state.settings.theme.readerPadding = dom.readerPadding.value;
                 state.settings.reading.bookEncoding = dom.bookEncoding.value;
                 state.settings.reading.paginationMode = dom.paginationMode.value;
                 state.settings.reading.autoGenerateSummaries = dom.autoSummaryToggle.checked;
+                // 排版参数变了 → 段落高度估算失效，需要按新规则重建渲染窗口
+                const layoutChanged = prevFontSize !== state.settings.theme.readerFontSize
+                    || prevLineHeight !== state.settings.theme.readerLineHeight
+                    || prevPadding !== state.settings.theme.readerPadding
+                    || prevPagination !== state.settings.reading.paginationMode;
                 
                 // 把当前编辑同步回激活的角色卡 / 身份，并各自持久化
                 syncSettingsToActiveCharacter();
@@ -1781,6 +2098,7 @@
 
                 await localforage.setItem('readingCompanionSettings', state.settings);
                 applySettings();
+                if (layoutChanged) setTimeout(rebuildReaderWindow, 0);
                 addSystemMessage('设置已保存');
                 hideSettings();
             } catch (e) { console.error('Error saving settings:', e); addSystemMessage(`保存设置失败: ${e.message}`); }
@@ -2144,7 +2462,7 @@
             applyCharacterToSettings(target);
             await loadChatHistory();
             await loadMemories();
-            if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent(); }
+            if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara }); }
             applySettings();
             renderProfiles();
             addSystemMessage(`已切换到角色「${target.name}」`, true);
@@ -2183,7 +2501,7 @@
             applyCharacterToSettings(c);
             await loadChatHistory();   // 新角色无历史，会清空聊天区
             await loadMemories();
-            if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent(); }
+            if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara }); }
             applySettings();
             hideProfilesModal();
             showCharacterSettings();
@@ -2226,7 +2544,7 @@
                 applyCharacterToSettings(getActiveCharacter());
                 await loadChatHistory();
                 await loadMemories();
-                if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent(); }
+                if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara }); }
                 applySettings();
             }
             renderProfiles();
@@ -2283,8 +2601,12 @@
 
         const applyPaginationMode = () => {
             const mode = state.settings.reading.paginationMode;
+            const { top, bottom } = getSpacers();
             if (mode === 'flip') {
                 dom.readerContentWrapper.classList.add('flip-mode');
+                // 多列排版下占位条会撑出空白列，必须清零（翻页模式改用分段渲染）
+                top.style.height = '0px';
+                bottom.style.height = '0px';
                 // Force calculate correct column width via JS because CSS percentage column-width is unreliable.
                 // Use sub-pixel accurate width (getBoundingClientRect) instead of the rounded clientWidth,
                 // otherwise the integer/fractional mismatch accumulates and pages drift after many pages.
@@ -2300,12 +2622,50 @@
             }
         };
 
+        // 切换分页模式 / 改变排版参数后，需要按新规则重建渲染窗口
+        const rebuildReaderWindow = () => {
+            if (!getActiveBook()) return;
+            resetAvgParaHeight();
+            const anchor = state.reading.curPara || 0;
+            const total = getParaTotal();
+            if (!total) return;
+            if (isFlipMode()) {
+                const segStart = Math.floor(anchor / FLIP_SEGMENT) * FLIP_SEGMENT;
+                renderParaWindow(segStart, segStart + FLIP_SEGMENT);
+            } else {
+                const start = Math.max(0, anchor - Math.floor(PARA_WINDOW / 3));
+                renderParaWindow(start, start + PARA_WINDOW);
+            }
+            applyPaginationMode();
+            scrollToPara(anchor);
+        };
+
+        // 仅重算上下占位条高度（首次渲染发生在阅读页隐藏时会测不准，切回来时校准一次）
+        const recalibrateSpacers = () => {
+            const book = getActiveBook();
+            if (!book || isFlipMode()) return;
+            const total = book.paragraphs.length;
+            if (!total || state.reading.winEnd <= state.reading.winStart) return;
+            const anchor = state.reading.curPara || 0;
+            resetAvgParaHeight();
+            const avg = getAvgParaHeight();
+            const { top, bottom } = getSpacers();
+            top.style.height = `${Math.round(state.reading.winStart * avg)}px`;
+            bottom.style.height = `${Math.round((total - state.reading.winEnd) * avg)}px`;
+            scrollToPara(anchor);
+        };
+
         // Re-calculate pagination when window resizes
         window.addEventListener('resize', debounce(() => {
+            if (!getActiveBook()) return;
             if (state.settings.reading.paginationMode === 'flip') {
                 applyPaginationMode();
+                scrollToPara(state.reading.curPara || 0);
+            } else {
+                // 宽度变化会改变段落高度，占位条估算需要重算
+                rebuildReaderWindow();
             }
-        }, 100));
+        }, 200));
 
         const updateThemePreview = () => {
             dom.themePreview.style.backgroundColor = dom.readerBgColor.value;
@@ -2845,26 +3205,49 @@
             }
         };
 
-        const handleFileUpload = (event) => { /* same code */
+        // 导入时把原始文本归一化：统一换行、去掉行尾空白、丢掉空行。
+        // 空行本来会被渲染成一个占位段落，网文里空行往往占一半，去掉后段落数直接腰斩。
+        const normalizeBookText = (raw) => {
+            const lines = String(raw || '').replace(/\r\n?/g, '\n').split('\n');
+            const out = [];
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].replace(/[ \t\u00a0]+$/, '');
+                if (!line.trim()) continue; // 空行不占段落
+                out.push(line);
+            }
+            return out.length ? out : [''];
+        };
+
+        const handleFileUpload = (event) => {
             const file = event.target.files[0];
             if (!file || !file.name.endsWith('.txt')) { addSystemMessage('请上传.txt格式的文件'); return; }
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const bookId = `book-${Date.now()}`;
                 const bookTitle = file.name.replace(/\.txt$/i, '');
-                const newBook = { id: bookId, title: bookTitle, paragraphs: e.target.result.split('\n'), toc: [], currentChapter: '', comments: {}, lastScrollTop: 0, lastScrollLeft: 0, _loaded: true };
+                const newBook = {
+                    id: bookId, title: bookTitle,
+                    paragraphs: normalizeBookText(e.target.result),
+                    toc: [], currentChapter: '', comments: {},
+                    lastScrollTop: 0, lastScrollLeft: 0, lastParaIndex: 0, _loaded: true
+                };
                 state.books[bookId] = newBook;
                 state.activeBookId = bookId;
                 generateTOC();
+
+                // 先把界面显示出来（只渲染首屏窗口，瞬时完成），再在后台落盘，
+                // 避免用户对着白屏等 IndexedDB 写完几 MB 正文。
+                hideBookListModal();
+                await switchView('reader-view');
+                displayBookContent({ anchorPara: 0 });
+                addSystemMessage(`开始阅读《${bookTitle}》`);
+
+                await loadCommentsForActiveBook();
                 await saveBookContent(bookId);
                 await saveBookProgress(bookId);
                 await saveBookIndex();
                 await localforage.setItem('lastActiveBookId', bookId);
-                await loadCommentsForActiveBook();
-                displayBookContent();
-                hideBookListModal();
-                switchView('reader-view');
-                addSystemMessage(`开始阅读《${bookTitle}》`);
+
                 if (state.settings.reading.autoGenerateSummaries) { await generateAllSummaries(bookTitle); }
                 else { confirmSummaryGeneration(bookTitle); }
             };
@@ -2879,9 +3262,10 @@
             await ensureBookLoaded(bookId);
             await loadCommentsForActiveBook();
             await localforage.setItem('lastActiveBookId', bookId);
-            displayBookContent();
             hideBookListModal();
-            switchView('reader-view');
+            // 必须先把阅读页显示出来再渲染：隐藏状态下测不到段落高度，占位条会算错
+            await switchView('reader-view');
+            displayBookContent({ anchorPara: state.books[bookId].lastParaIndex || 0 });
         };
         const deleteBook = async (bookId) => {
             if (!state.books[bookId]) return;
@@ -2906,7 +3290,7 @@
             setTimeout(() => { if (confirm(`是否为《${bookTitle}》生成章节摘要？`)) { generateAllSummaries(bookTitle); } }, 100);
         };
 
-        const displayBookContent = () => {
+        const displayBookContent = (opts = {}) => {
             const activeBook = getActiveBook();
             if (!activeBook) {
                 dom.bookTitle.textContent = '阅读';
@@ -2917,58 +3301,33 @@
             dom.bookTitle.textContent = activeBook.title;
             if (!activeBook.toc || (activeBook.toc.length === 0 && activeBook.paragraphs.length > 0)) { generateTOC(); }
 
-            dom.readerContent.innerHTML = '';
-            const fragment = document.createDocumentFragment();
-            activeBook.paragraphs.forEach((paraText, index) => {
-                const pEl = document.createElement('p');
-                pEl.dataset.paraId = index;
-                pEl.id = `para-id-${index}`;
-                let paraContent = paraText.trim() || ' ';
-                const comments = activeBook.comments[index];
-                if (comments && comments.length > 0) {
-                     /* ... highlight logic (same as before) ... */
-                    const highlights = [];
-                    comments.forEach(comment => {
-                        if (comment.quote) {
-                            const startIndex = paraContent.indexOf(comment.quote);
-                            if (startIndex !== -1) { highlights.push({ start: startIndex, end: startIndex + comment.quote.length, comment: comment }); }
-                        }
-                    });
-                    highlights.sort((a, b) => a.start - b.start);
-                    const uniqueHighlights = [];
-                    let lastEnd = -1;
-                    for (const h of highlights) {
-                        if (h.start >= lastEnd) { uniqueHighlights.push(h); lastEnd = h.end; }
-                    }
-                    const contentSpan = document.createElement('span');
-                    let lastIndex = 0;
-                    uniqueHighlights.forEach(h => {
-                        if (h.start > lastIndex) { contentSpan.appendChild(document.createTextNode(paraContent.substring(lastIndex, h.start))); }
-                        const highlightSpan = document.createElement('span');
-                        const highlightClass = h.comment.type === 'user' ? 'user-highlight' : 'comment-highlight';
-                        highlightSpan.className = highlightClass;
-                        highlightSpan.dataset.highlightId = h.comment.highlightId;
-                        highlightSpan.textContent = paraContent.substring(h.start, h.end);
-                        contentSpan.appendChild(highlightSpan);
-                        lastIndex = h.end;
-                    });
-                    if (lastIndex < paraContent.length) { contentSpan.appendChild(document.createTextNode(paraContent.substring(lastIndex))); }
-                    pEl.appendChild(contentSpan);
-                } else {
-                    pEl.innerHTML = `<span>${paraContent}</span>`;
-                }
-                if (comments && comments.length > 0) { renderCommentIcons(pEl, comments); }
-                fragment.appendChild(pEl);
-            });
-            dom.readerContent.appendChild(fragment);
+            // 只渲染当前阅读位置附近的一个窗口，而不是整本书
+            resetAvgParaHeight();
+            const anchor = Math.max(0, Math.min(
+                (typeof opts.anchorPara === 'number' ? opts.anchorPara : (activeBook.lastParaIndex || 0)),
+                Math.max(0, activeBook.paragraphs.length - 1)
+            ));
+            state.reading.curPara = anchor;
+            if (isFlipMode()) {
+                const segStart = Math.floor(anchor / FLIP_SEGMENT) * FLIP_SEGMENT;
+                renderParaWindow(segStart, segStart + FLIP_SEGMENT);
+            } else {
+                const start = Math.max(0, anchor - Math.floor(PARA_WINDOW / 3));
+                renderParaWindow(start, start + PARA_WINDOW);
+            }
             renderTOC();
             setTimeout(() => {
                 applyPaginationMode();
-                if(state.settings.reading.paginationMode === 'flip') {
-                    dom.readerContentWrapper.scrollLeft = activeBook.lastScrollLeft || 0;
-                } else {
-                    dom.readerContentWrapper.scrollTop = activeBook.lastScrollTop || 0;
+                if (!isFlipMode()) {
+                    // 首屏渲染完成后用真实高度校准占位条，滚动条长度才准确
+                    resetAvgParaHeight();
+                    const avg = getAvgParaHeight();
+                    const total = activeBook.paragraphs.length;
+                    const { top, bottom } = getSpacers();
+                    top.style.height = `${Math.round(state.reading.winStart * avg)}px`;
+                    bottom.style.height = `${Math.round((total - state.reading.winEnd) * avg)}px`;
                 }
+                scrollToPara(anchor);
                 updateReadingProgress();
             }, 0);
         };
@@ -3024,15 +3383,23 @@
             if (!activeBook) return;
             activeBook.lastScrollTop = dom.readerContentWrapper.scrollTop;
             activeBook.lastScrollLeft = dom.readerContentWrapper.scrollLeft;
+            activeBook.lastParaIndex = state.reading.curPara || 0;
             await saveBookProgress(activeBook.id);
         };
 
         // ===== 书籍分片存储：正文只写一次，进度高频但极小，批注按角色隔离 =====
         // 只保存正文与目录（导入 / 目录变化时调用，很少触发）
+        // 正文存成「一整个字符串」而不是几万个字符串的数组：
+        // structured clone 对数组每一项都要单独序列化，几万项在手机上要好几秒。
         const saveBookContent = async (id) => {
             const b = state.books[id];
             if (!b) return;
-            await localforage.setItem('book_' + id, { id: b.id, title: b.title, paragraphs: b.paragraphs || [], toc: b.toc || [] });
+            await localforage.setItem('book_' + id, {
+                id: b.id,
+                title: b.title,
+                text: (b.paragraphs || []).join('\n'),
+                toc: b.toc || []
+            });
         };
         // 只保存阅读进度（滚动时高频调用，体积极小）
         const saveBookProgress = async (id) => {
@@ -3042,6 +3409,7 @@
                 currentChapter: b.currentChapter || '',
                 lastScrollTop: b.lastScrollTop || 0,
                 lastScrollLeft: b.lastScrollLeft || 0,
+                lastParaIndex: b.lastParaIndex || 0,
             });
         };
         // 书架索引（只含 id + 标题，启动时无需读取全部正文）
@@ -3068,11 +3436,33 @@
             if (!b) return null;
             if (b._loaded) return b;
             const content = await localforage.getItem('book_' + id);
-            if (content) { b.paragraphs = content.paragraphs || []; b.toc = content.toc || []; if (content.title) b.title = content.title; }
+            if (content) {
+                // 兼容两种格式：新版单字符串 text，旧版 paragraphs 数组
+                if (typeof content.text === 'string') b.paragraphs = content.text.split('\n');
+                else b.paragraphs = content.paragraphs || [];
+                b.toc = content.toc || [];
+                if (content.title) b.title = content.title;
+            }
             const prog = await localforage.getItem('bookprog_' + id) || {};
             b.currentChapter = prog.currentChapter || '';
             b.lastScrollTop = prog.lastScrollTop || 0;
             b.lastScrollLeft = prog.lastScrollLeft || 0;
+            // 旧版只存了像素滚动位置，这里做一次迁移：优先用已读章节定位，
+            // 否则按平均段高把像素折算成段落下标，避免老书回到第一页。
+            if (typeof prog.lastParaIndex === 'number') {
+                b.lastParaIndex = prog.lastParaIndex;
+            } else {
+                let guess = 0;
+                const chap = (b.toc || []).find(t => t.title === b.currentChapter);
+                if (chap) {
+                    guess = chap.paraIndex;
+                } else if (b.lastScrollTop > 0) {
+                    const fontSize = parseFloat(state.settings.theme.readerFontSize) || 17;
+                    const lineH = parseFloat(state.settings.theme.readerLineHeight) || 1.8;
+                    guess = Math.floor(b.lastScrollTop / Math.max(8, fontSize * lineH * 2.2));
+                }
+                b.lastParaIndex = Math.max(0, Math.min(guess, Math.max(0, b.paragraphs.length - 1)));
+            }
             b._loaded = true;
             return b;
         };
@@ -3105,16 +3495,34 @@
             // 依据索引建立轻量骨架，正文延后按需加载
             state.books = {};
             (index || []).forEach(item => {
-                state.books[item.id] = { id: item.id, title: item.title, paragraphs: [], toc: [], currentChapter: '', lastScrollTop: 0, lastScrollLeft: 0, comments: {}, _loaded: false };
+                state.books[item.id] = { id: item.id, title: item.title, paragraphs: [], toc: [], currentChapter: '', lastScrollTop: 0, lastScrollLeft: 0, lastParaIndex: 0, comments: {}, _loaded: false };
             });
+        };
+
+        // 滚动模式下：接近窗口上下边界时，增量渲染下一批段落
+        const maybeExtendParaWindow = () => {
+            if (isFlipMode() || state.reading.rendering) return;
+            const w = dom.readerContentWrapper;
+            const { top, bottom } = getSpacers();
+            const threshold = Math.max(600, w.clientHeight * 1.5);
+            // 距离底部占位条不足一屏半 → 向后追加
+            if (w.scrollHeight - (w.scrollTop + w.clientHeight) - spacerH(bottom) < threshold) {
+                growParaWindowDown();
+            }
+            // 距离顶部占位条不足一屏半 → 向前追加
+            if (w.scrollTop - spacerH(top) < threshold) {
+                growParaWindowUp();
+            }
         };
 
         const handleReaderScroll = () => {
             hideSelectionMenu();
             const activeBook = getActiveBook();
             if (!activeBook) return;
-            
-            updateReadingProgress();
+
+            // 进度更新走 rAF 节流；原来每个滚动事件都全量遍历目录 + 读取布局，是滚动卡顿的主因
+            scheduleProgressUpdate();
+            maybeExtendParaWindow();
 
             clearTimeout(state.reading.scrollTimeout);
             state.reading.scrollTimeout = setTimeout(() => {
@@ -3487,13 +3895,13 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             // AI 情绪配音：懒处理——到达某段时，先让 LLM 把它切成带情绪的小片段，就地展开
             const emoOn = (state.settings.tts || {}).emotionEnabled === true;
             if (emoOn && !item.emotionDone && !item.emotion) {
-                ttsSetReadingHighlight(item.p);
+                ttsSetReadingHighlight(ttsResolvePara(item.pid));
                 if (dom.ttsStatus) dom.ttsStatus.textContent = '正在分析情绪…';
                 let segs = null;
                 try { segs = await ttsAnalyzeEmotions(item.text); } catch (e) { segs = null; }
                 if (!ttsPlayer.active) return;
                 if (segs && segs.length) {
-                    const expanded = segs.map(s => ({ p: item.p, text: s.text, emotion: s.emotion, emotionDone: true }));
+                    const expanded = segs.map(s => ({ pid: item.pid, text: s.text, emotion: s.emotion, emotionDone: true }));
                     ttsPlayer.queue.splice(i, 1, ...expanded);
                 } else {
                     item.emotionDone = true;
@@ -3501,7 +3909,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 item = ttsPlayer.queue[i];
             }
 
-            ttsSetReadingHighlight(item.p);
+            ttsSetReadingHighlight(ttsResolvePara(item.pid));
             ttsUpdateUI();
             let src = item._url;
             if (!src) {
@@ -3521,25 +3929,28 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             try { await audio.play(); } catch (e) { ttsPlayer.paused = true; ttsUpdateUI(); /* 被自动播放策略拦截：切到暂停态，用户点播放键即可在手势内启动 */ }
         };
 
+        // 队列里只存段落下标，播到哪一段再解析成 DOM 元素（元素可能被虚拟化回收）
+        const ttsResolvePara = (pid) => {
+            if (typeof pid !== 'number') return null;
+            ensureParaRendered(pid);
+            return document.getElementById(`para-id-${pid}`);
+        };
+
         const startTts = async () => {
             if (ttsPlayer.active) return;
             const book = getActiveBook();
             if (!book) { addSystemMessage('请先打开一本书'); return; }
             if (!(state.settings.tts || {}).apiKey) { addSystemMessage('请先在「设置 → 语音朗读」中填写 API Key'); return; }
-            // 从当前可见位置开始，收集其后的段落
-            const allP = Array.from(dom.readerContent.querySelectorAll('p')).filter(p => p.textContent.trim().length > 0);
-            if (!allP.length) { addSystemMessage('当前没有可朗读的内容'); return; }
-            const cRect = dom.readerContentWrapper.getBoundingClientRect();
-            let startIdx = allP.findIndex(p => {
-                const r = p.getBoundingClientRect();
-                return r.bottom > cRect.top + 2 && r.right > cRect.left + 2;
-            });
-            if (startIdx < 0) startIdx = 0;
+            const paras = book.paragraphs || [];
+            if (!paras.length) { addSystemMessage('当前没有可朗读的内容'); return; }
+            // 从当前阅读位置开始，直接按段落下标排队（不再依赖 DOM，因此不受渲染窗口限制）
+            const startPid = Math.max(0, Math.min(state.reading.curPara || 0, paras.length - 1));
             const queue = [];
-            for (let i = startIdx; i < allP.length; i++) {
-                const t = allP[i].textContent.trim();
+            const MAX_TTS_CHUNKS = 3000; // 上限保护：避免一次排出几万条队列
+            for (let i = startPid; i < paras.length && queue.length < MAX_TTS_CHUNKS; i++) {
+                const t = (paras[i] || '').trim();
                 if (t.length < 1) continue;
-                ttsSplitChunks(t).forEach(c => { if (c.trim()) queue.push({ p: allP[i], text: c.trim() }); });
+                ttsSplitChunks(t).forEach(c => { if (c.trim()) queue.push({ pid: i, text: c.trim() }); });
             }
             if (!queue.length) { addSystemMessage('当前没有可朗读的内容'); return; }
             ttsPlayer.active = true;
@@ -3997,7 +4408,12 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
 
         const highlightRange = (range, highlightClass, highlightId) => { /* same code */
             if (range.collapsed) return;
-            const allParagraphs = Array.from(dom.readerContent.querySelectorAll('p'));
+            // 只在选区覆盖的范围内找段落，而不是遍历全部已渲染段落
+            let scope = range.commonAncestorContainer;
+            if (scope.nodeType !== Node.ELEMENT_NODE) scope = scope.parentElement;
+            if (!scope || !dom.readerContent.contains(scope)) scope = dom.readerContent;
+            const candidates = (scope.tagName === 'P') ? [scope] : Array.from(scope.querySelectorAll('p'));
+            const allParagraphs = candidates.length ? candidates : Array.from(dom.readerContent.querySelectorAll('p'));
             const affectedParagraphs = new Set();
             allParagraphs.forEach(p => {
                 if (range.intersectsNode(p, true)) {
@@ -4100,6 +4516,11 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             if (!activeBook || !activeBook.toc || activeBook.toc.length === 0) return;
             const chaptersToGenerate = activeBook.toc.filter(chapter => { const bookSummaries = state.summaries[bookTitle] || {}; return !bookSummaries[chapter.title]; });
             if (chaptersToGenerate.length === 0) { addSystemMessage(`《${bookTitle}》的章节摘要已存在，无需生成。`); return; }
+            // 长篇动辄几百上千章，逐章调用接口会持续很久且可能被限流，先让用户确认
+            if (chaptersToGenerate.length > 30 &&
+                !confirm(`《${bookTitle}》有 ${chaptersToGenerate.length} 章需要生成摘要，会逐章请求 AI，耗时较长且可能产生较多费用。确定继续吗？\n\n（也可以之后在「更多 → 章节摘要」里按需单章生成）`)) {
+                return;
+            }
             updateSummaryProgress('start', `准备为《${bookTitle}》生成摘要...`);
             let successCount = 0; let firstError = null;
             for (let i = 0; i < chaptersToGenerate.length; i++) {
@@ -4187,16 +4608,10 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
 
         const jumpToParagraph = (paraIndex, highlightQuery) => {
             hideSearchModal();
-            // Highlight result logic could be added here (e.g., temporary span)
+            // 目标段落可能还没渲染，先把它所在的窗口渲染出来
+            if (!scrollToPara(paraIndex, { smooth: !isFlipMode() })) return;
             const p = document.getElementById(`para-id-${paraIndex}`);
-            if(p) {
-                if(state.settings.reading.paginationMode === 'flip') {
-                    // For flip mode, we simply scroll the element into view horizontally
-                     p.scrollIntoView({ block: 'nearest', inline: 'start' });
-                } else {
-                    p.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-                
+            if (p) {
                 // Temporary Highlight
                 p.classList.add('search-highlight');
                 setTimeout(() => p.classList.remove('search-highlight'), 2000);
@@ -4318,20 +4733,30 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
 
             if (mode === 'flip') {
                 // Calculate current scroll position (page index)
-                const currentScroll = dom.readerContentWrapper.scrollLeft;
+                const wrapper = dom.readerContentWrapper;
+                const currentScroll = wrapper.scrollLeft;
                 const currentPage = Math.round(currentScroll / width);
+                const maxScroll = wrapper.scrollWidth - wrapper.clientWidth;
 
                 // 30% zones left and right
                 if (relativeX < width * 0.3) {
                     // Prev Page (Scroll to specific page index to ensure alignment)
                     hideReaderNav();
-                    const targetPage = Math.max(0, currentPage - 1);
-                    dom.readerContentWrapper.scrollTo({ left: targetPage * width, behavior: 'smooth' });
+                    if (currentPage <= 0) {
+                        // 已在本分段第一页 → 载入上一分段（翻页模式只对当前分段做多列排版）
+                        flipSegmentShift(-1);
+                    } else {
+                        wrapper.scrollTo({ left: (currentPage - 1) * width, behavior: 'smooth' });
+                    }
                 } else if (relativeX > width * 0.7) {
                     // Next Page
                     hideReaderNav();
-                    const targetPage = currentPage + 1; // Limit checked by scroll bounds automatically
-                    dom.readerContentWrapper.scrollTo({ left: targetPage * width, behavior: 'smooth' });
+                    if (currentScroll >= maxScroll - 4) {
+                        // 已在本分段最后一页 → 载入下一分段
+                        flipSegmentShift(1);
+                    } else {
+                        wrapper.scrollTo({ left: (currentPage + 1) * width, behavior: 'smooth' });
+                    }
                 } else {
                     // 中央区域：切换章节导航面板
                     toggleReaderNav();
@@ -4500,14 +4925,8 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         dom.tocList.addEventListener('click', (e) => {
             const li = e.target.closest('li');
             if (li && li.dataset.paraIndex) {
-                const anchor = document.getElementById(`para-id-${li.dataset.paraIndex}`);
-                if (anchor) {
-                    if (state.settings.reading.paginationMode === 'flip') {
-                         anchor.scrollIntoView({ block: 'nearest', inline: 'start' });
-                    } else {
-                         anchor.scrollIntoView({ behavior: 'smooth' });
-                    }
-                }
+                // 走虚拟窗口跳转，跨几千段也是瞬时的
+                scrollToPara(parseInt(li.dataset.paraIndex, 10) || 0);
                 toggleTOC(false);
             }
         });
