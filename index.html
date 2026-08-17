@@ -7,7 +7,7 @@
 
     <!-- 版本标记：修复页(reset.html)靠它判断浏览器加载的到底是新版还是缓存里的旧版。
          每次改完代码上传前，把这里的日期/序号往后改一位即可。 -->
-    <meta name="app-build" content="2026-08-17-b">
+    <meta name="app-build" content="2026-08-17-c">
 
     <!-- PWA 配置 - iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -464,7 +464,11 @@
         .toc-list li:hover { background-color: var(--panel-bg-color); }
         .toc-list li.active { color: var(--accent-color); font-weight: bold; }
 
-        #settings-view { z-index: 150; }
+        /* settings-view 只在激活时才置于高层；未激活时必须沉到底层，
+           否则它那 translateX(100%) 的"隐藏态"仍以 z-index:150 盖在最前面，
+           在移动端合成层没及时重绘时就会挡住一切点击 —— 这正是"退不出设置"的根因。 */
+        #settings-view { z-index: 1; }
+        #settings-view.active { z-index: 150; }
         .settings-header { display: flex; align-items: center; padding: 12px 15px; background-color: #fff; box-shadow: 0 2px 5px var(--shadow-light); flex-shrink: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .settings-header h2 { margin: 0; font-size: 18px; flex-grow: 1; text-align: center; pointer-events: none; }
         /* 返回按钮：pointer-events: none 让所有触摸事件穿透到 header，由 header 统一处理关闭。
@@ -2065,7 +2069,12 @@
             dom.settingsView.classList.add('active');
         };
         const showCharacterSettings = () => showSettings('char');
-        const hideSettings = () => dom.settingsView.classList.remove('active');
+        const hideSettings = () => {
+            dom.settingsView.classList.remove('active');
+            // 兜底：某些移动端浏览器在只改 transform 目标值时不会立即重绘合成层，
+            // 导致设置页视觉上"没滑走"、继续挡住点击。读一次布局属性强制同步重排，把画面刷新到位。
+            void dom.settingsView.offsetHeight;
+        };
 
         // ===== 世界书（Lorebook）编辑器 =====
         const createWorldEntryRow = (entry = {}) => {
