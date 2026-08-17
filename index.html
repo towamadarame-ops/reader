@@ -19,7 +19,105 @@
     <link rel="apple-touch-icon" id="app-icon-ios" href="">
     <link rel="icon" id="app-icon" href="">
 
-    <script src="https://unpkg.com/localforage@1.10.0/dist/localforage.min.js"></script>
+    <!-- 存储库：优先用随项目一起部署的本地文件。
+         以前只从 unpkg 加载，手机网络常常访问不到 CDN，一旦失败 localforage 就是 undefined，
+         整个 App 会静默死掉（能看到界面但什么都点不动），而电脑上往往能正常访问所以看不出问题。 -->
+    <script src="./localforage.min.js"></script>
+    <script>
+        // 本地文件万一没上传成功，再回退到 CDN（解析阶段的 document.write 会同步插入并执行）
+        if (typeof localforage === 'undefined') {
+            document.write('<script src="https://unpkg.com/localforage@1.10.0/dist/localforage.min.js"><\/script>');
+        }
+    </script>
+    <script>
+        /* ==========================================================
+         * 应急引导（刻意独立成一个 script 块）
+         * 主逻辑是一个几千行的大 script，其中任何一处语法/运行时错误
+         * 都会让整块脚本失效、所有事件监听器都绑不上，页面就变成
+         * "能滑动但点什么都没反应"。这一块独立出来，保证：
+         *   1) 出错时用户能看到原因，而不是对着一个死界面；
+         *   2) 永远有一条自救通道（?reset=1）可以清掉旧缓存。
+         * 使用了最保守的 ES5 语法，确保任何老浏览器都能执行。
+         * ========================================================== */
+        (function () {
+            'use strict';
+
+            // ---- 自救通道：地址后面加 ?reset=1 可强制清掉 Service Worker 与全部缓存 ----
+            // 手机被旧版本缓存卡住、或者更新后打开还是老界面时用这个。
+            if (/[?&]reset=1\b/.test(location.search)) {
+                var done = function () {
+                    location.replace(location.pathname); // 去掉参数后重新打开
+                };
+                var jobs = [];
+                try {
+                    if (window.caches && caches.keys) {
+                        jobs.push(caches.keys().then(function (keys) {
+                            return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                        }));
+                    }
+                    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+                        jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+                            return Promise.all(rs.map(function (r) { return r.unregister(); }));
+                        }));
+                    }
+                } catch (e) { /* 老浏览器直接跳过 */ }
+                if (jobs.length) {
+                    Promise.all(jobs).then(done, done);
+                    setTimeout(done, 4000); // 兜底：无论如何都要跳走
+                } else {
+                    done();
+                }
+                return;
+            }
+
+            // ---- 把错误显示出来，而不是静默失败 ----
+            var shown = false;
+            function showFatal(title, detail) {
+                if (shown) return;
+                shown = true;
+                var wrap = document.createElement('div');
+                wrap.setAttribute('style', 'position:fixed;left:0;right:0;top:0;z-index:2147483647;' +
+                    'background:#fff5f5;border-bottom:2px solid #e57373;color:#333;' +
+                    'font:14px/1.7 -apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;' +
+                    'padding:14px 16px;box-shadow:0 2px 12px rgba(0,0,0,.18);max-height:70%;overflow:auto;');
+                var safe = String(detail || '').replace(/[<>&]/g, function (c) {
+                    return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c];
+                });
+                wrap.innerHTML =
+                    '<div style="font-weight:700;margin-bottom:6px;">' + title + '</div>' +
+                    '<div style="color:#666;font-size:13px;word-break:break-all;">' + safe + '</div>' +
+                    '<div style="margin-top:12px;">' +
+                    '<a href="?reset=1" style="display:inline-block;padding:9px 16px;background:#a3ccc4;' +
+                    'color:#fff;border-radius:8px;text-decoration:none;font-size:14px;">清除缓存并重新加载</a>' +
+                    '</div>';
+                var put = function () { if (document.body) document.body.appendChild(wrap); };
+                if (document.body) put(); else document.addEventListener('DOMContentLoaded', put);
+            }
+            window.__showFatal = showFatal;
+
+            window.addEventListener('error', function (e) {
+                // 资源加载失败（img/script 等）不弹窗，只关心脚本执行错误
+                if (e && e.target && e.target !== window && e.target.tagName) return;
+                var msg = (e && e.message) || '未知错误';
+                var at = e && e.filename ? ('\n位置：第 ' + e.lineno + ' 行') : '';
+                showFatal('页面脚本出错了，功能可能不可用', msg + at);
+            }, true);
+
+            window.addEventListener('unhandledrejection', function (e) {
+                var r = e && e.reason;
+                showFatal('初始化失败', (r && (r.message || r)) || '未知原因');
+            });
+
+            // 存储库没加载成功时，App 必然全盘失效，提前给出明确提示
+            document.addEventListener('DOMContentLoaded', function () {
+                if (typeof window.localforage === 'undefined') {
+                    showFatal('存储组件加载失败，数据无法读写',
+                        '请确认 localforage.min.js 已和 index.html 一起上传到同一目录；' +
+                        '若是网络原因，换个网络后点下面的按钮重新加载。');
+                }
+            });
+        })();
+    </script>
     <style>
         :root {
             --bg-color: #e0eee8;
@@ -1084,7 +1182,11 @@
 
     <script>
     // 动态生成 Manifest 和 Icon
+    // 注意：这段跑在事件监听器注册之前，且独占一个 script 块。
+    // 一旦它抛错（canvas 被限制、DOM 节点缺失等），后面的主逻辑就全都不会执行，
+    // 页面会变成"能滑动但点什么都没反应"，所以这里必须整体 try/catch 包住。
     (function() {
+        try {
         // 用 canvas 生成 PNG 图标：iOS 的 apple-touch-icon 不支持 SVG，必须是不透明位图，否则图标会变成网页截图
         const roundRect = (ctx, x, y, w, h, r) => {
             ctx.beginPath();
@@ -1143,8 +1245,14 @@
         document.getElementById('app-manifest').setAttribute('href', manifestURL);
         document.getElementById('app-icon').setAttribute('href', icon192);
         document.getElementById('app-icon-ios').setAttribute('href', icon180);
+        } catch (err) {
+            // 图标/Manifest 只影响"装到桌面后好不好看"，绝不能因此让整个 App 失效
+            console.warn('[PWA] 动态 Manifest 生成失败，已跳过：', err);
+        }
     })();
+    </script>
 
+    <script>
     document.addEventListener('DOMContentLoaded', () => {
         // ... (保持原有的JS逻辑完全不变，只增加PWA相关内容)
         const dom = {
@@ -1891,7 +1999,8 @@
 
 
         const switchView = async (viewId) => {
-            if (document.querySelector('.view.active')?.id === 'reader-view' && viewId !== 'reader-view') {
+            const prevActive = document.querySelector('.view.active');
+            if (prevActive && prevActive.id === 'reader-view' && viewId !== 'reader-view') {
                 await saveCurrentBookProgress();
                 hideStatusBar();
             }
@@ -2801,7 +2910,7 @@
             dom.messageContainer.appendChild(wrapper);
             dom.chatArea.scrollTop = dom.chatArea.scrollHeight;
         };
-        const removeTypingIndicator = () => { document.getElementById('typing-indicator-container')?.parentElement.remove(); state.isAiTyping = false; };
+        const removeTypingIndicator = () => { const tic = document.getElementById('typing-indicator-container'); if (tic && tic.parentElement) tic.parentElement.remove(); state.isAiTyping = false; };
         const handleSendMessage = () => {
             const text = dom.messageInput.value.trim();
             if (!text) return;
@@ -2826,11 +2935,11 @@
                 });
                 if (!response.ok) {
                     let errorMessage = `API请求失败: HTTP ${response.status} ${response.statusText}`;
-                    try { const errorBody = await response.json(); errorMessage += `\n详情: ${errorBody.error?.message || errorBody.message}`; } catch(e){}
+                    try { const errorBody = await response.json(); errorMessage += `\n详情: ${(errorBody.error && errorBody.error.message) || errorBody.message}`; } catch(e){}
                     throw new Error(errorMessage);
                 }
                 const data = await response.json();
-                if (!data.choices || data.choices.length === 0 || !data.choices[0].message?.content) throw new Error('API返回了无效或空的响应');
+                if (!data.choices || data.choices.length === 0 || !(data.choices[0].message && data.choices[0].message.content)) throw new Error('API返回了无效或空的响应');
                 return { content: data.choices[0].message.content };
             } catch (error) {
                 console.error('AI call failed:', error);
@@ -2993,7 +3102,7 @@
 
             const activeBook = getActiveBook();
             let scene = '';
-            if (activeBook?.title) {
+            if (activeBook && activeBook.title) {
                 scene = `你们正在一起阅读《${activeBook.title}》`;
                 if (activeBook.currentChapter) scene += `，读到「${activeBook.currentChapter}」`;
                 scene += '。';
@@ -3002,7 +3111,7 @@
             if (scene) parts.push(`【当前场景】\n${scene}`);
 
             // 注入已读剧情，让角色真正理解剧情脉络与人物，而非孤立分析一句话
-            if (activeBook?.title) {
+            if (activeBook && activeBook.title) {
                 const story = getStorySoFar(activeBook, activeBook.currentChapter);
                 if (story) {
                     parts.push(`【本书已读剧情（截至当前进度，你和${userName}都已读过，请当作共同记忆，理解人物关系与故事走向，聊起来要显得你真的读懂了剧情）】\n${story}`);
@@ -3693,7 +3802,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         // 在阅读区显示一个伴侣小气泡；opts.reply 为可选的"回应"话题（点后跳到聊天）
         const showReaderBubble = (text, opts = {}) => {
             if (!text || !dom.readerBubble) return;
-            if (document.querySelector('.view.active')?.id !== 'reader-view') return;
+            const curView = document.querySelector('.view.active'); if (!curView || curView.id !== 'reader-view') return;
             clearTimeout(readerBubbleTimer);
             dom.readerBubbleAvatar.src = state.settings.aiAvatar || '';
             dom.readerBubbleName.textContent = state.settings.aiName || '伴侣';
@@ -3739,7 +3848,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             state.reading.readCareInterval = setInterval(() => {
                 const comp = state.settings.companion || {};
                 if (comp.careEnabled === false) return;
-                if (document.querySelector('.view.active')?.id !== 'reader-view') return;
+                const curView = document.querySelector('.view.active'); if (!curView || curView.id !== 'reader-view') return;
                 if (!getActiveBook()) return;
                 const minutes = Math.max(1, parseInt(comp.careMinutes, 10) || 30);
                 if (Date.now() - (state.reading.readCareBase || 0) >= minutes * 60000) {
@@ -4298,7 +4407,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             const paraId = pElement.dataset.paraId;
             const comments = activeBook.comments[paraId];
             if (!comments || comments.length === 0) return;
-            document.querySelector('.comment-popup')?.remove();
+            const oldPopup = document.querySelector('.comment-popup'); if (oldPopup) oldPopup.remove();
             const popup = document.createElement('div');
             popup.className = `comment-popup`;
             let contentHTML = '';
@@ -5009,10 +5118,40 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             window.navigator.standalone === true;
 
         // 1) 注册 Service Worker（仅在 http(s)/localhost 下有效，file:// 会静默跳过）
+        //    updateViaCache:'none' 很关键：不加的话浏览器会用 HTTP 缓存里的旧 sw.js，
+        //    导致旧 Service Worker 一直存活、手机上永远打开的是旧界面。
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch((err) => {
-                    console.warn('[PWA] Service Worker 注册失败：', err);
+                navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+                    .then((reg) => {
+                        // 每次打开都主动检查一次更新
+                        try { reg.update(); } catch (e) {}
+
+                        // 发现新版本已装好 → 让它立刻接管
+                        const askActivate = (worker) => {
+                            if (!worker) return;
+                            worker.addEventListener('statechange', () => {
+                                if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    worker.postMessage('SKIP_WAITING');
+                                }
+                            });
+                        };
+                        if (reg.waiting && navigator.serviceWorker.controller) {
+                            reg.waiting.postMessage('SKIP_WAITING');
+                        }
+                        askActivate(reg.installing);
+                        reg.addEventListener('updatefound', () => askActivate(reg.installing));
+                    })
+                    .catch((err) => {
+                        console.warn('[PWA] Service Worker 注册失败：', err);
+                    });
+
+                // 新 Service Worker 接管后自动刷新一次，保证用到的是新代码（只刷一次，避免死循环）
+                let reloadedOnce = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (reloadedOnce) return;
+                    reloadedOnce = true;
+                    location.reload();
                 });
             });
         }
