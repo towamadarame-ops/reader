@@ -7,7 +7,7 @@
 
     <!-- 版本标记：修复页(reset.html)靠它判断浏览器加载的到底是新版还是缓存里的旧版。
          每次改完代码上传前，把这里的日期/序号往后改一位即可。 -->
-    <meta name="app-build" content="2026-08-17-a">
+    <meta name="app-build" content="2026-08-17-b">
 
     <!-- PWA 配置 - iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -465,10 +465,11 @@
         .toc-list li.active { color: var(--accent-color); font-weight: bold; }
 
         #settings-view { z-index: 150; }
-        .settings-header { display: flex; align-items: center; padding: 10px 15px; background-color: #fff; box-shadow: 0 2px 5px var(--shadow-light); flex-shrink: 0; }
-        .settings-header h2 { margin: 0; font-size: 18px; flex-grow: 1; text-align: center; }
-        /* 返回按钮：必须在标题上面，且点击区域足够大（手指 44px 最小触摸目标） */
-        .settings-header .icon-btn { position: relative; z-index: 1; min-width: 44px; min-height: 44px; margin: -10px -5px -10px -10px; display: flex; align-items: center; justify-content: center; }
+        .settings-header { display: flex; align-items: center; padding: 12px 15px; background-color: #fff; box-shadow: 0 2px 5px var(--shadow-light); flex-shrink: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .settings-header h2 { margin: 0; font-size: 18px; flex-grow: 1; text-align: center; pointer-events: none; }
+        /* 返回按钮：pointer-events: none 让所有触摸事件穿透到 header，由 header 统一处理关闭。
+           视觉上保持小图标，但实际触摸区域是整个 header 条。 */
+        .settings-header .icon-btn { position: relative; z-index: 1; pointer-events: none; }
         .settings-content { flex-grow: 1; overflow-y: auto; padding: 20px; background-color: var(--bg-color); }
         .settings-group { background-color: #fff; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px var(--shadow-light); }
         /* 角色设置 / 通用设置 分屏：按作用域只显示对应分组 */
@@ -787,8 +788,8 @@
             </div>
 
             <div id="settings-view" class="view">
-                <header class="settings-header">
-                    <button class="icon-btn" id="settings-back-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z" /></svg></button>
+                <header class="settings-header" id="settings-header-bar">
+                    <button class="icon-btn" id="settings-back-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z" /></svg></button>
                     <h2 id="settings-title">设置</h2>
                 </header>
                 <div class="settings-content" id="settings-content">
@@ -4978,8 +4979,30 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         };
         if (dom.pfCharList) dom.pfCharList.addEventListener('click', handleProfileListClick);
         if (dom.pfPersonaList) dom.pfPersonaList.addEventListener('click', handleProfileListClick);
-        dom.settingsBackBtn.addEventListener('click', hideSettings);
+
+        // ===== 设置页关闭：多重冗余，确保手机触摸一定能退出 =====
+        // 原来只绑了返回按钮的 click，但手机上存在两个问题：
+        //   1) 按钮太小（16px），手指点不准；
+        //   2) 某些安卓 WebView 里 touchend→click 的合成偶尔会失败。
+        // 现在：
+        //   A) 把整个 header 条都做成"点击/触摸即关闭"（按钮和标题已设 pointer-events:none）；
+        //   B) 同时绑定 click 和 touchend，互不冲突；
+        //   C) 底栏导航的 switchView 本身也会移除 active（已有），这里不需要额外处理。
+        const doHideSettings = (e) => {
+            if (e && e.type === 'touchend') e.preventDefault(); // 阻止后续 click 重复触发
+            hideSettings();
+        };
+        dom.settingsBackBtn.addEventListener('click', doHideSettings);
+        dom.settingsBackBtn.addEventListener('touchend', doHideSettings);
+        const headerBar = document.getElementById('settings-header-bar');
+        if (headerBar) {
+            headerBar.addEventListener('click', doHideSettings);
+            headerBar.addEventListener('touchend', doHideSettings);
+        }
+
         dom.saveSettingsBtn.addEventListener('click', saveSettings);
+        // 保存按钮也加 touchend 备用
+        dom.saveSettingsBtn.addEventListener('touchend', (e) => { e.preventDefault(); saveSettings(); });
         if (dom.addWorldEntryBtn) dom.addWorldEntryBtn.addEventListener('click', () => dom.worldBookContainer.appendChild(createWorldEntryRow()));
         if (dom.memorySummarizeNowBtn) dom.memorySummarizeNowBtn.addEventListener('click', async () => {
             dom.memorySummarizeNowBtn.disabled = true;
@@ -5020,7 +5043,11 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         dom.readerBgImageInput.addEventListener('change', (e) => handleImageUpload(e, (result) => { state.settings.theme.readerBgImage = result; updateThemePreview(); }));
         dom.chatBgInput.addEventListener('change', (e) => handleImageUpload(e, (result) => { state.settings.chatBgImage = result; document.documentElement.style.setProperty('--chat-bg-image', `url(${result})`); }));
 
-        dom.navItems.forEach(item => item.addEventListener('click', () => switchView(item.dataset.view)));
+        dom.navItems.forEach(item => {
+            item.addEventListener('click', () => switchView(item.dataset.view));
+            // 手机触摸备用：某些 WebView 里 touchend→click 合成偶尔失败
+            item.addEventListener('touchend', (e) => { e.preventDefault(); switchView(item.dataset.view); });
+        });
         dom.tocBtn.addEventListener('click', () => toggleTOC(true));
         if (dom.readerCommentBtn) dom.readerCommentBtn.addEventListener('click', manualCommentOnCurrentChapter);
         if (dom.notesBtn) dom.notesBtn.addEventListener('click', showNotesModal);
@@ -5335,6 +5362,79 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             hint.appendChild(closeBtn);
             document.body.appendChild(hint);
         })();
+    })();
+    </script>
+
+    <!-- 独立 fallback 脚本：即使主脚本完全崩掉，手机也一定能退出设置页和切换导航。
+         它在一个单独的 <script> 块里，和主脚本互不影响。
+         使用最保守的事件委托方式，不依赖任何全局变量或闭包函数。 -->
+    <script>
+    (function() {
+        'use strict';
+
+        // 关闭设置页：直接操作 classList，不调用任何主脚本的函数
+        function forceCloseSettings() {
+            var sv = document.getElementById('settings-view');
+            if (sv) sv.classList.remove('active');
+        }
+
+        // 切换视图：和主脚本的 switchView 做同样的事
+        function forceSwitch(viewId) {
+            var views = document.querySelectorAll('.view');
+            for (var i = 0; i < views.length; i++) views[i].classList.remove('active');
+            var target = document.getElementById(viewId);
+            if (target) target.classList.add('active');
+            var navs = document.querySelectorAll('.nav-item');
+            for (var j = 0; j < navs.length; j++) {
+                if (navs[j].getAttribute('data-view') === viewId) navs[j].classList.add('active');
+                else navs[j].classList.remove('active');
+            }
+        }
+
+        // 事件委托：在 document 上用捕获阶段监听，确保最高优先级
+        document.addEventListener('touchend', function(e) {
+            var t = e.target;
+
+            // 点到了 settings-header 区域（包含返回按钮和标题）
+            var header = t.closest ? t.closest('.settings-header') : null;
+            if (!header) {
+                // 兼容不支持 closest 的老浏览器
+                var n = t;
+                while (n && n !== document) {
+                    if (n.classList && n.classList.contains('settings-header')) { header = n; break; }
+                    n = n.parentElement;
+                }
+            }
+            if (header) {
+                e.preventDefault();
+                forceCloseSettings();
+                return;
+            }
+
+            // 点到了 settings-back-btn
+            if (t.id === 'settings-back-btn' || (t.closest && t.closest('#settings-back-btn'))) {
+                e.preventDefault();
+                forceCloseSettings();
+                return;
+            }
+
+            // 点到了底栏导航
+            var navItem = t.closest ? t.closest('.nav-item') : null;
+            if (!navItem) {
+                var m = t;
+                while (m && m !== document) {
+                    if (m.classList && m.classList.contains('nav-item')) { navItem = m; break; }
+                    m = m.parentElement;
+                }
+            }
+            if (navItem) {
+                var view = navItem.getAttribute('data-view');
+                if (view) {
+                    e.preventDefault();
+                    forceSwitch(view);
+                }
+            }
+        }, true); // true = 捕获阶段，最高优先级
     })();
     </script>
 </body>
