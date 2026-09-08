@@ -14,7 +14,7 @@
  */
 
 // 改动代码后请把这里的版本号 +1，可确保所有旧缓存被清掉
-const SW_VERSION = 'v8';
+const SW_VERSION = 'v9';
 const CACHE_NAME = 'peiban-reader-' + SW_VERSION;
 
 // 需要预缓存的 App 外壳资源（单个失败不影响整体安装）
