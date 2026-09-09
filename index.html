@@ -7,7 +7,7 @@
 
     <!-- 版本标记：修复页(reset.html)靠它判断浏览器加载的到底是新版还是缓存里的旧版。
          每次改完代码上传前，把这里的日期/序号往后改一位即可。 -->
-    <meta name="app-build" content="2026-09-09-b">
+    <meta name="app-build" content="2026-09-09-c">
 
     <!-- PWA 配置 - iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1715,7 +1715,11 @@
                 visibleParas: null, // Set：当前与视口相交的段落下标
                 paraObserver: null, // IntersectionObserver
                 progressRaf: 0,     // 进度刷新的 rAF 句柄，用于节流
-                rendering: false,   // 渲染中标记，避免滚动回调重入
+                rendering: false,   // 渲染中标记，避免滚动重入
+                // 待恢复的阅读位置。启动时阅读页是隐藏的（默认停在聊天页），
+                // 隐藏元素没有布局，offsetTop 全是 0、scrollTop 也赋不进去，
+                // 所以那一刻无法定位。这里先把目标存起来，等阅读页真正可见时再精确恢复。
+                pendingRestore: null, // null | { para, offset, flipPage }
             },
             longPressTimer: null,
             selection: {
@@ -2027,6 +2031,30 @@
             w.scrollLeft = Math.max(0, Math.min((page || 0) * pw, maxLeft));
         };
 
+        // 阅读页此刻是否真的有布局（隐藏时宽高为 0，任何定位都会失效）
+        const isReaderVisible = () => {
+            const v = document.getElementById('reader-view');
+            if (!v || !v.classList.contains('active')) return false;
+            const w = dom.readerContentWrapper;
+            return !!w && (w.clientHeight > 0 || w.clientWidth > 0);
+        };
+
+        // 执行一次精确定位：段落 + 段内偏移（滚动模式）/ 页码（翻页模式）
+        const restoreReadingPosition = ({ para = 0, offset = 0, flipPage = 0 } = {}) => {
+            if (!scrollToPara(para, { offset })) return false;
+            if (isFlipMode() && flipPage > 0) applyFlipPage(flipPage);
+            updateReadingProgress();
+            return true;
+        };
+
+        // 若存在「待恢复」的位置且阅读页已可见，就把它兑现（只兑现一次）
+        const consumePendingRestore = () => {
+            const p = state.reading.pendingRestore;
+            if (!p || !isReaderVisible()) return false;
+            state.reading.pendingRestore = null;
+            return restoreReadingPosition(p);
+        };
+
         // 滚动/翻页到指定段落
         const scrollToPara = (index, { smooth = false, offset = 0 } = {}) => {
             if (!ensureParaRendered(index)) return false;
@@ -2035,8 +2063,13 @@
             if (isFlipMode()) {
                 el.scrollIntoView({ block: 'nearest', inline: 'start' });
             } else {
-                // offset：已滚过该段顶部的像素数，用于把位置恢复到段落内部（长段落必需）
-                const target = Math.max(0, el.offsetTop - 2 + (offset || 0));
+                // offset：已滚过该段顶部的像素数，用于把位置恢复到段落内部（长段落必需）。
+                // 有 offset 时必须以「段顶」为基准精确相加——要和 getCurParaOffset 的基准完全一致，
+                // 否则每次切走再切回都会少 2px，反复切换会累积漂移。
+                // 无 offset 时（目录跳转 / 搜索定位）保留 2px 留白，让正文不贴着屏幕上沿。
+                const target = offset
+                    ? Math.max(0, el.offsetTop + offset)
+                    : Math.max(0, el.offsetTop - 2);
                 if (smooth) dom.readerContentWrapper.scrollTo({ top: target, behavior: 'smooth' });
                 else dom.readerContentWrapper.scrollTop = target;
             }
@@ -2235,6 +2268,15 @@
             const prevActive = document.querySelector('.view.active');
             if (prevActive && prevActive.id === 'reader-view' && viewId !== 'reader-view') {
                 await saveCurrentBookProgress();
+                // 记下离开时的精确位置：切回来时阅读页要重新布局，
+                // 光靠段落下标会丢掉段内偏移与页码，回来就会往前跳。
+                if (getActiveBook()) {
+                    state.reading.pendingRestore = {
+                        para: state.reading.curPara || 0,
+                        offset: getCurParaOffset(),
+                        flipPage: getFlipPage(),
+                    };
+                }
                 hideStatusBar();
             }
             dom.views.forEach(v => v.classList.remove('active'));
@@ -2255,9 +2297,13 @@
                     const activeBook = getActiveBook();
                     if(activeBook) {
                         applyPaginationMode(); // Ensure correct mode
-                        // 虚拟化渲染后按「段落下标」恢复位置，比像素更可靠（改字号也不会跑偏）
-                        if (state.reading.winEnd > state.reading.winStart) recalibrateSpacers();
-                        else scrollToPara(state.reading.curPara || activeBook.lastParaIndex || 0);
+                        // 启动时阅读页是隐藏的，位置定不了，会留下 pendingRestore；
+                        // 这里是它第一次真正可见，优先把上次的进度精确兑现（含段内偏移 / 页码）。
+                        if (!consumePendingRestore()) {
+                            // 虚拟化渲染后按「段落下标」恢复位置，比像素更可靠（改字号也不会跑偏）
+                            if (!isFlipMode() && state.reading.winEnd > state.reading.winStart) recalibrateSpacers();
+                            else scrollToPara(state.reading.curPara || activeBook.lastParaIndex || 0);
+                        }
                         updateReadingProgress();
                     }
                 }, 100);
@@ -3698,6 +3744,9 @@
                 renderParaWindow(start, start + PARA_WINDOW);
             }
             renderTOC();
+            // 无论此刻能否定位，都先登记目标位置；
+            // 阅读页隐藏时（启动默认在聊天页）这里定不了位，留给切到阅读页时兑现。
+            state.reading.pendingRestore = { para: anchor, offset: anchorOffset, flipPage };
             setTimeout(() => {
                 applyPaginationMode();
                 if (!isFlipMode()) {
@@ -3709,10 +3758,13 @@
                     top.style.height = `${Math.round(state.reading.winStart * avg)}px`;
                     bottom.style.height = `${Math.round((total - state.reading.winEnd) * avg)}px`;
                 }
-                scrollToPara(anchor, { offset: anchorOffset });
-                // 段落跨列时 scrollToPara 只能落到该段起始页，这里用页码精确回到原来那一页
-                if (isFlipMode() && flipPage > 0) applyFlipPage(flipPage);
-                updateReadingProgress();
+                // 阅读页可见才真正定位；隐藏时保留 pendingRestore，等切过来再兑现
+                if (isReaderVisible()) {
+                    state.reading.pendingRestore = null;
+                    restoreReadingPosition({ para: anchor, offset: anchorOffset, flipPage });
+                } else {
+                    updateReadingProgress();
+                }
             }, 0);
         };
         
