@@ -1850,7 +1850,16 @@
                     if (min !== Infinity) state.reading.curPara = min;
                 }
                 scheduleProgressUpdate();
-            }, { root: dom.readerContentWrapper, threshold: 0 });
+            }, {
+                root: dom.readerContentWrapper,
+                // 滚动模式：只在顶部留一道负边距，段落必须「实际延伸到屏幕上沿往下一点」
+                // 才算当前段。否则上一段只剩最后一两行挂在屏幕最顶端（1px 也算相交）时，
+                // 它会因下标最小而被当成 curPara，导致进度、章节和下次恢复都往前偏一整段。
+                // 翻页模式不能用这个负边距：多列排版下一页就是一整列，
+                // 页首那段若很短会被整个排除，反而让章节名和进度提前跳到下一段。
+                rootMargin: isFlipMode() ? '0px' : '-10% 0px 0px 0px',
+                threshold: 0
+            });
             return state.reading.paraObserver;
         };
         const observePara = (el) => { try { ensureParaObserver().observe(el); } catch (e) {} };
@@ -2000,15 +2009,34 @@
             return !!document.getElementById(`para-id-${idx}`);
         };
 
+        // ===== 翻页模式的页码定位 =====
+        // 多列排版下，一个长段落会横跨好几列（好几页），它的元素盒子也跨列，
+        // 所以 scrollIntoView 只能回到「这一段开始的那一页」，而不是你真正停下的那一页。
+        // 因此翻页模式必须额外记住页码（scrollLeft / 一页宽度），恢复时直接定位。
+        const getFlipPage = () => {
+            if (!isFlipMode()) return 0;
+            const w = dom.readerContentWrapper;
+            const pw = w.clientWidth || 1;
+            return Math.max(0, Math.round(w.scrollLeft / pw));
+        };
+        // 跳到指定页；排版变化（字号/屏幕）导致总页数变少时会夹到最后一页，不会停在空白处
+        const applyFlipPage = (page) => {
+            const w = dom.readerContentWrapper;
+            const pw = w.clientWidth || 1;
+            const maxLeft = Math.max(0, w.scrollWidth - pw);
+            w.scrollLeft = Math.max(0, Math.min((page || 0) * pw, maxLeft));
+        };
+
         // 滚动/翻页到指定段落
-        const scrollToPara = (index, { smooth = false } = {}) => {
+        const scrollToPara = (index, { smooth = false, offset = 0 } = {}) => {
             if (!ensureParaRendered(index)) return false;
             const el = document.getElementById(`para-id-${index}`);
             if (!el) return false;
             if (isFlipMode()) {
                 el.scrollIntoView({ block: 'nearest', inline: 'start' });
             } else {
-                const target = Math.max(0, el.offsetTop - 2);
+                // offset：已滚过该段顶部的像素数，用于把位置恢复到段落内部（长段落必需）
+                const target = Math.max(0, el.offsetTop - 2 + (offset || 0));
                 if (smooth) dom.readerContentWrapper.scrollTo({ top: target, behavior: 'smooth' });
                 else dom.readerContentWrapper.scrollTop = target;
             }
@@ -2794,7 +2822,7 @@
             applyCharacterToSettings(target);
             await loadChatHistory();
             await loadMemories();
-            if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara }); }
+            if (getActiveBook()) { const fp = getFlipPage(); await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara, flipPage: fp }); }
             applySettings();
             renderProfiles();
             addSystemMessage(`已切换到角色「${target.name}」`, true);
@@ -2833,7 +2861,7 @@
             applyCharacterToSettings(c);
             await loadChatHistory();   // 新角色无历史，会清空聊天区
             await loadMemories();
-            if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara }); }
+            if (getActiveBook()) { const fp = getFlipPage(); await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara, flipPage: fp }); }
             applySettings();
             hideProfilesModal();
             showCharacterSettings();
@@ -2876,7 +2904,7 @@
                 applyCharacterToSettings(getActiveCharacter());
                 await loadChatHistory();
                 await loadMemories();
-                if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara }); }
+                if (getActiveBook()) { const fp = getFlipPage(); await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara, flipPage: fp }); }
                 applySettings();
             }
             renderProfiles();
@@ -3652,6 +3680,16 @@
                 Math.max(0, activeBook.paragraphs.length - 1)
             ));
             state.reading.curPara = anchor;
+            // 只有「恢复上次进度」时才沿用段内偏移；
+            // 显式指定 anchorPara（目录跳转 / 搜索定位 / 新书）应当落在段首。
+            const anchorOffset = (typeof opts.anchorOffset === 'number')
+                ? opts.anchorOffset
+                : (typeof opts.anchorPara === 'number' ? 0 : (activeBook.lastParaOffset || 0));
+            // 翻页模式的页码：只有「回到上次进度」时才沿用，
+            // 目录跳转 / 搜索定位这类明确指定了别的段落时，应落到那一段所在的页。
+            const flipPage = (typeof opts.flipPage === 'number')
+                ? opts.flipPage
+                : (anchor === (activeBook.lastParaIndex || 0) ? (activeBook.lastFlipPage || 0) : 0);
             if (isFlipMode()) {
                 const segStart = Math.floor(anchor / FLIP_SEGMENT) * FLIP_SEGMENT;
                 renderParaWindow(segStart, segStart + FLIP_SEGMENT);
@@ -3671,7 +3709,9 @@
                     top.style.height = `${Math.round(state.reading.winStart * avg)}px`;
                     bottom.style.height = `${Math.round((total - state.reading.winEnd) * avg)}px`;
                 }
-                scrollToPara(anchor);
+                scrollToPara(anchor, { offset: anchorOffset });
+                // 段落跨列时 scrollToPara 只能落到该段起始页，这里用页码精确回到原来那一页
+                if (isFlipMode() && flipPage > 0) applyFlipPage(flipPage);
                 updateReadingProgress();
             }, 0);
         };
@@ -3722,12 +3762,28 @@
             getChatResponse({ userMessage: command });
         };
         
+        // 当前滚动位置相对 curPara 段顶部的像素偏移。
+        // 只记到「第几段」的话，长段落恢复时会退回段首，看起来就是"每次都往前跳一点"。
+        const getCurParaOffset = () => {
+            if (isFlipMode()) return 0;
+            const el = document.getElementById(`para-id-${state.reading.curPara || 0}`);
+            if (!el) return 0;
+            const off = Math.round(dom.readerContentWrapper.scrollTop - el.offsetTop);
+            // 自限幅：正向不超过该段自身高度，反向不超过一屏，避免窗口重建瞬间取到异常值
+            const max = el.offsetHeight || 0;
+            const min = -(dom.readerContentWrapper.clientHeight || 0);
+            return Math.max(min, Math.min(max, off));
+        };
+
         const saveCurrentBookProgress = async () => {
             const activeBook = getActiveBook();
             if (!activeBook) return;
             activeBook.lastScrollTop = dom.readerContentWrapper.scrollTop;
             activeBook.lastScrollLeft = dom.readerContentWrapper.scrollLeft;
             activeBook.lastParaIndex = state.reading.curPara || 0;
+            activeBook.lastParaOffset = getCurParaOffset();
+            // 翻页模式下记住页码；滚动模式不覆盖，免得切回翻页时丢了原来的页
+            if (isFlipMode()) activeBook.lastFlipPage = getFlipPage();
             await saveBookProgress(activeBook.id);
         };
 
@@ -3754,6 +3810,8 @@
                 lastScrollTop: b.lastScrollTop || 0,
                 lastScrollLeft: b.lastScrollLeft || 0,
                 lastParaIndex: b.lastParaIndex || 0,
+                lastParaOffset: b.lastParaOffset || 0,
+                lastFlipPage: b.lastFlipPage || 0,
             });
         };
         // 书架索引（只含 id + 标题，启动时无需读取全部正文）
@@ -3807,6 +3865,8 @@
                 }
                 b.lastParaIndex = Math.max(0, Math.min(guess, Math.max(0, b.paragraphs.length - 1)));
             }
+            b.lastParaOffset = typeof prog.lastParaOffset === 'number' ? prog.lastParaOffset : 0;
+            b.lastFlipPage = typeof prog.lastFlipPage === 'number' ? prog.lastFlipPage : 0;
             b._loaded = true;
             return b;
         };
@@ -5731,6 +5791,18 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         });
         
         dom.settingsBtn.addEventListener('click', () => showSettings('general'));
+
+        // 阅读进度保底落盘：滚动保存有 500ms 防抖，手机上「划走 App」/ 切后台 / 关页面时
+        // 那次定时器很可能还没执行，最后一段进度就丢了，下次打开自然回到更早的位置。
+        const flushReadingProgress = () => {
+            if (!getActiveBook()) return;
+            clearTimeout(state.reading.scrollTimeout);
+            saveCurrentBookProgress();
+        };
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') flushReadingProgress();
+        });
+        window.addEventListener('pagehide', flushReadingProgress);
 
         // 角色 / 身份 管理弹窗
         if (dom.profilesBtn) dom.profilesBtn.addEventListener('click', showProfilesModal);
