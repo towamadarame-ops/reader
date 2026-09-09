@@ -1,5 +1,5 @@
 /*
- * 陪伴阅读 - Service Worker
+ * ♡‧₊ ✧ ₊‧♡ - Service Worker
  * 作用：缓存 App 外壳，实现离线可用，并让站点满足「可安装 PWA」的条件。
  * 提示：Service Worker 只能在 http(s) 或 localhost 下生效，file:// 直接打开无法注册。
  *
@@ -14,7 +14,7 @@
  */
 
 // 改动代码后请把这里的版本号 +1，可确保所有旧缓存被清掉
-const SW_VERSION = 'v10';
+const SW_VERSION = 'v11';
 const CACHE_NAME = 'peiban-reader-' + SW_VERSION;
 
 // 需要预缓存的 App 外壳资源（单个失败不影响整体安装）

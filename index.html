@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>陪伴阅读</title>
+    <title>♡‧₊ ✧ ₊‧♡</title>
 
     <!-- 版本标记：修复页(reset.html)靠它判断浏览器加载的到底是新版还是缓存里的旧版。
          每次改完代码上传前，把这里的日期/序号往后改一位即可。 -->
-    <meta name="app-build" content="2026-08-17-f">
+    <meta name="app-build" content="2026-09-09-b">
 
     <!-- PWA 配置 - iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="陪伴阅读">
+    <meta name="apple-mobile-web-app-title" content="♡‧₊ ✧ ₊‧♡">
     
     <!-- PWA 配置 - Android/Desktop -->
     <meta name="theme-color" content="#e0eee8">
@@ -1084,7 +1084,7 @@
                     <div class="settings-group">
                         <h3>安装到桌面</h3>
                         <div class="form-item">
-                            <label>把「陪伴阅读」添加为手机 App，全屏无地址栏使用</label>
+                            <label>把「♡‧₊ ✧ ₊‧♡」添加为手机 App，全屏无地址栏使用</label>
                             <button id="install-app-btn" class="inline-btn action-btn">添加到桌面 / 安装 App</button>
                         </div>
                         <p style="font-size:12px;color:var(--secondary-text-color);margin:6px 0 0;">安卓 / 桌面 Chrome 可一键安装；iPhone 需在 Safari 中通过「分享 → 添加到主屏幕」，点按钮会有图文引导。</p>
@@ -1391,8 +1391,8 @@
         const icon512 = makeIcon(512);
         
         const manifest = {
-            "name": "陪伴阅读",
-            "short_name": "伴读",
+            "name": "♡‧₊ ✧ ₊‧♡",
+            "short_name": "♡‧₊ ✧ ₊‧♡",
             "start_url": ".",
             "display": "standalone",
             "background_color": "#e0eee8",
@@ -5612,7 +5612,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `reading_companion_backup_${new Date().toISOString().slice(0,10)}.json`;
+            a.download = `♡‧₊ ✧ ₊‧♡ 备份 ${new Date().toISOString().slice(0,10)}.json`;
             a.click();
             URL.revokeObjectURL(url);
         };
@@ -6227,7 +6227,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 'box-shadow:0 4px 16px rgba(0,0,0,0.3)',
                 'cursor:pointer'
             ].join(';');
-            hint.innerHTML = '想把「陪伴阅读」放到桌面？点这里查看步骤：用 Safari 的「分享 ' + shareIconSvg + ' → 添加到主屏幕」即可全屏使用。';
+            hint.innerHTML = '想把「♡‧₊ ✧ ₊‧♡」放到桌面？点这里查看步骤：用 Safari 的「分享 ' + shareIconSvg + ' → 添加到主屏幕」即可全屏使用。';
             hint.addEventListener('click', (e) => {
                 if (e.target === closeBtn) return;
                 showGuideModal('在 iPhone 上添加到桌面', iosGuideBody);
