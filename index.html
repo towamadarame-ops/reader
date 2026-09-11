@@ -7,7 +7,7 @@
 
     <!-- 版本标记：修复页(reset.html)靠它判断浏览器加载的到底是新版还是缓存里的旧版。
          每次改完代码上传前，把这里的日期/序号往后改一位即可。 -->
-    <meta name="app-build" content="2026-09-09-c">
+    <meta name="app-build" content="2026-09-11-a">
 
     <!-- PWA 配置 - iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -5326,6 +5326,8 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             const oldPopup = document.querySelector('.comment-popup'); if (oldPopup) oldPopup.remove();
             const popup = document.createElement('div');
             popup.className = `comment-popup`;
+            // 记住这个弹窗是哪个段落的角标打开的，供角标再次点击时判断「关闭还是切换」
+            popup.dataset.ownerParaId = paraId;
             let contentHTML = '';
             comments.forEach((comment, index) => {
                 const avatarSrc = comment.type === 'user' ? state.settings.userAvatar : state.settings.aiAvatar;
@@ -5377,6 +5379,23 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             });
         };
         const hideCommentPopup = () => { const popup = document.querySelector('.comment-popup'); if (popup) { popup.classList.remove('show'); setTimeout(() => popup.remove(), 200); } };
+
+        // 角标即开关：已展开同一条就收起；展开的是别的段落则直接切过去。
+        // 这样不必再点正文空白处去关闭，也就不会顺带唤出划词菜单 / 触发翻页。
+        const toggleCommentPopup = (targetIcon) => {
+            const pElement = targetIcon.closest('p');
+            if (!pElement) return;
+            // 这次点击不再冒泡到全局监听，划词菜单得自己收起来，免得残留在屏幕上
+            hideSelectionMenu();
+            const paraId = pElement.dataset.paraId;
+            const popup = document.querySelector('.comment-popup');
+            // 正在关闭动画中的弹窗（已移除 show）不算展开，此时应重新打开
+            if (popup && popup.classList.contains('show') && popup.dataset.ownerParaId === String(paraId)) {
+                hideCommentPopup();
+                return;
+            }
+            showCommentPopup(targetIcon);
+        };
         const calculatePopupPosition = (targetElement, popupElement) => { /* same code */
             const wrapperRect = dom.readerContentWrapper.getBoundingClientRect();
             const targetRect = targetElement.getBoundingClientRect();
@@ -6026,7 +6045,8 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         });
         dom.readerContent.addEventListener('click', (e) => {
             const icon = e.target.closest('.comment-icon');
-            if (icon) { showCommentPopup(icon); }
+            // 角标自己消化掉这次点击：既防止冒泡到翻页/划词逻辑，也避免全局监听重复处理
+            if (icon) { e.stopPropagation(); e.preventDefault(); toggleCommentPopup(icon); return; }
             if (e.target.id === 'upload-book-btn-placeholder') { showBookListModal(); }
         });
         document.addEventListener('selectionchange', handleSelectionChange);
