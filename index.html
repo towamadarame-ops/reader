@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>陪伴阅读</title>
+    <title>♡‧₊ ✧ ₊‧♡</title>
 
     <!-- 版本标记：修复页(reset.html)靠它判断浏览器加载的到底是新版还是缓存里的旧版。
          每次改完代码上传前，把这里的日期/序号往后改一位即可。 -->
-    <meta name="app-build" content="2026-08-17-f">
+    <meta name="app-build" content="2026-09-11-b">
 
     <!-- PWA 配置 - iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="陪伴阅读">
+    <meta name="apple-mobile-web-app-title" content="♡‧₊ ✧ ₊‧♡">
     
     <!-- PWA 配置 - Android/Desktop -->
     <meta name="theme-color" content="#e0eee8">
@@ -347,6 +347,10 @@
         .comment-popup .comment-header .name { font-weight: 600; font-size: 13px; }
         .comment-popup .comment-body { padding-top: 8px; border-top: 1px solid #eee; cursor: pointer; white-space: pre-wrap; }
         .comment-popup .comment-body:first-child { padding-top: 0; border-top: none; }
+        .comment-popup .comment-header .cmt-edit-btn { margin-left: auto; background: var(--panel-bg-color); border: none; border-radius: 8px; padding: 2px 8px; font-size: 11px; color: var(--secondary-text-color); cursor: pointer; font-family: inherit; flex-shrink: 0; }
+        .comment-popup .cmt-text { white-space: pre-wrap; }
+        .comment-popup .cmt-edit-area { width: 100%; box-sizing: border-box; min-height: 70px; border: 1px solid var(--accent-color); border-radius: 6px; padding: 6px; font-size: 13px; line-height: 1.6; resize: vertical; font-family: inherit; margin-top: 4px; }
+        .comment-popup .cmt-edit-bar { display: flex; gap: 6px; margin-top: 6px; }
 
         #selection-menu {
             position: fixed;
@@ -378,21 +382,49 @@
         #selection-menu button:not(:last-child) { border-right: 1px solid rgba(255, 255, 255, 0.2); }
         #selection-menu button:active { background-color: rgba(255, 255, 255, 0.1); }
 
-        #user-comment-modal, #summary-modal, #book-list-modal, #search-modal, #notes-modal {
+        #user-comment-modal, #summary-modal, #book-list-modal, #search-modal, #notes-modal, #reflection-modal, #stats-modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;
             z-index: 300; opacity: 0; visibility: hidden; transition: opacity 0.2s;
         }
-        #user-comment-modal.show, #summary-modal.show, #search-modal.show, #notes-modal.show { 
+        #user-comment-modal.show, #summary-modal.show, #search-modal.show, #notes-modal.show, #reflection-modal.show, #stats-modal.show { 
             opacity: 1; visibility: visible; align-items: flex-start; padding-top: 20px;
         }
         #book-list-modal.show {
             opacity: 1; visibility: visible;
         }
-        .comment-modal-content, .summary-modal-content, .book-list-modal-content, .search-modal-content, .notes-modal-content { background-color: white; padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); display: flex; flex-direction: column; max-height: 80vh; }
-        .comment-modal-content h4, .summary-modal-content h4, .book-list-modal-content h4, .search-modal-content h4, .notes-modal-content h4 { margin-top: 0; }
+        .comment-modal-content, .summary-modal-content, .book-list-modal-content, .search-modal-content, .notes-modal-content, .reflection-modal-content, .stats-modal-content { background-color: white; padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); display: flex; flex-direction: column; max-height: 80vh; }
+        .comment-modal-content h4, .summary-modal-content h4, .book-list-modal-content h4, .search-modal-content h4, .notes-modal-content h4, .reflection-modal-content h4, .stats-modal-content h4 { margin-top: 0; }
         .comment-modal-content textarea { width: 100%; min-height: 80px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; font-size: 16px; margin-bottom: 15px; resize: vertical; }
-        .comment-modal-buttons, .summary-modal-buttons, .book-list-modal-buttons, .search-modal-buttons, .notes-modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; flex-shrink: 0; }
+        .comment-modal-buttons, .summary-modal-buttons, .book-list-modal-buttons, .search-modal-buttons, .notes-modal-buttons, .reflection-modal-buttons, .stats-modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; flex-shrink: 0; }
+
+        /* 阅读概览 */
+        #stats-body { flex-grow: 1; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+        .st-sec { margin-bottom: 16px; }
+        .st-sec:last-child { margin-bottom: 0; }
+        .st-sec-title { font-size: 12px; color: var(--secondary-text-color); margin-bottom: 6px; }
+        .st-bar { height: 8px; border-radius: 4px; background: #eee; overflow: hidden; margin-bottom: 6px; }
+        .st-bar-fill { height: 100%; background: var(--accent-color); }
+        .st-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .st-cell { background: var(--panel-bg-color); border-radius: 10px; padding: 10px; }
+        .st-num { font-size: 20px; font-weight: 600; color: var(--primary-text-color); }
+        .st-label { font-size: 11px; color: var(--secondary-text-color); margin-top: 2px; }
+        .st-line { display: flex; align-items: baseline; font-size: 13px; padding: 4px 0; border-bottom: 1px dashed #eee; }
+        .st-line:last-child { border-bottom: none; }
+        .st-line .st-k { color: var(--secondary-text-color); }
+        .st-line .st-v { margin-left: auto; font-weight: 600; }
+
+        /* 配色预设 */
+        .theme-presets { margin-bottom: 12px; }
+        .theme-presets-label { font-size: 12px; color: var(--secondary-text-color); }
+        .theme-preset-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+        .theme-preset { display: flex; align-items: center; gap: 6px; border: 1px solid #ddd; border-radius: 20px; padding: 5px 12px 5px 6px; background: #fff; cursor: pointer; font-size: 12px; font-family: inherit; color: var(--primary-text-color); }
+        .theme-preset .tp-dot { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.12); flex-shrink: 0; }
+        .theme-preset.active { border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(163,204,196,0.35); }
+
+        /* 备份提醒 */
+        .backup-hint { font-size: 12px; line-height: 1.6; padding: 8px 10px; border-radius: 8px; background: #fff6e5; color: #8a6a2f; border: 1px solid #f0dcb4; margin-bottom: 10px; }
+        .backup-hint.ok { background: var(--panel-bg-color); color: var(--secondary-text-color); border-color: #e6e6e6; }
 
         #notes-list { flex-grow: 1; overflow-y: auto; margin: 0 -5px; padding: 0 5px; }
         #notes-list .notes-empty { color: var(--secondary-text-color); text-align: center; padding: 30px 0; }
@@ -434,6 +466,46 @@
         .summary-options .form-item { display: flex; align-items: center; justify-content: space-between; }
         .summary-options label { margin-bottom: 0; }
         .summary-options input[type="checkbox"] { width: 20px; height: 20px; }
+
+        /* ===== 读后感 / 感想 ===== */
+        .rf-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-shrink: 0; }
+        .rf-tab { flex: 1; background: #f2f2f2; border: none; padding: 8px 0; border-radius: 8px; font-size: 13px; color: var(--secondary-text-color); cursor: pointer; font-family: inherit; }
+        .rf-tab.active { background: var(--accent-color); color: #fff; }
+        .rf-body { flex-grow: 1; overflow-y: auto; margin: 0 -5px; padding: 0 5px; }
+        .rf-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .rf-row > label { font-size: 13px; color: var(--secondary-text-color); flex-shrink: 0; }
+        .rf-row select, .rf-row input[type="number"] { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; font-family: inherit; background: #fff; }
+        .rf-row input[type="number"] { max-width: 100px; }
+        .rf-row input[type="checkbox"] { width: 18px; height: 18px; margin-left: auto; }
+        .rf-label { display: flex; align-items: center; font-size: 13px; color: var(--secondary-text-color); margin: 14px 0 6px; }
+        .rf-label .rf-mini-btn { margin-left: auto; }
+        .rf-mini-btn { background: #cce3de; border: none; border-radius: 10px; padding: 3px 10px; font-size: 12px; cursor: pointer; font-family: inherit; color: var(--primary-text-color); }
+        .rf-mini-btn.danger { background: #ffdad6; color: #c0392b; }
+        #rf-prompt { width: 100%; box-sizing: border-box; min-height: 110px; border: 1px solid #ddd; border-radius: 8px; padding: 8px; font-size: 13px; line-height: 1.6; resize: vertical; font-family: inherit; }
+        .rf-hint { font-size: 12px; color: var(--secondary-text-color); margin: 6px 0 0; line-height: 1.5; }
+        .rf-result { margin-top: 14px; border-top: 1px solid #eee; padding-top: 12px; }
+        .rf-result-meta { font-size: 12px; color: var(--secondary-text-color); margin-bottom: 6px; }
+        .rf-result-text { white-space: pre-wrap; line-height: 1.7; font-size: 14.5px; color: var(--primary-text-color); }
+        .rf-result-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+        .rf-item { border-bottom: 1px solid #eee; padding: 10px 0; }
+        .rf-item:last-child { border-bottom: none; }
+        .rf-item-head { display: flex; align-items: center; gap: 8px; }
+        .rf-item-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rf-item-time { font-size: 11px; color: var(--secondary-text-color); margin-left: auto; flex-shrink: 0; }
+        .rf-item-text { white-space: pre-wrap; line-height: 1.7; font-size: 14px; margin-top: 6px; }
+        .rf-item-text.collapsed { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .rf-item-actions { display: flex; gap: 6px; margin-top: 8px; }
+        .rf-empty { color: var(--secondary-text-color); text-align: center; padding: 30px 0; font-size: 13px; }
+        .rf-edit-area { width: 100%; box-sizing: border-box; min-height: 140px; margin-top: 6px; border: 1px solid var(--accent-color); border-radius: 8px; padding: 8px; font-size: 14px; line-height: 1.7; resize: vertical; font-family: inherit; }
+        .rf-author-row { padding-bottom: 10px; border-bottom: 1px solid #eee; }
+        .rf-saved-toolbar { display: flex; gap: 8px; margin-bottom: 8px; }
+        .rf-saved-toolbar select { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; font-family: inherit; background: #fff; }
+        .rf-saved-count { font-size: 12px; color: var(--secondary-text-color); margin-bottom: 6px; }
+        .rf-item-author { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 8px; background: #a3ccc4; color: #fff; flex-shrink: 0; }
+        .rf-item-book { font-size: 11px; color: var(--secondary-text-color); margin-top: 2px; }
+        .rf-pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 0 4px; }
+        .rf-pager button[disabled] { opacity: 0.4; cursor: default; }
+        .rf-page-info { font-size: 12px; color: var(--secondary-text-color); }
 
         #summary-progress-modal {
             position: fixed;
@@ -769,6 +841,8 @@
                             <div class="reader-more-menu" id="reader-more-menu">
                                 <button id="summary-btn"><svg viewBox="0 0 24 24"><path d="M14 17H16V19H14V17M14 15H16V10H14V15M20 2H4C2.9 2 2 2.9 2 4V20C2 21.1 2.9 22 4 22H20C21.1 22 22 21.1 22 20V4C22 2.9 21.1 2 20 2M12 9H8V5H12V9M20 20H4V4H20V20Z"/></svg>章节摘要</button>
                                 <button id="notes-btn"><svg viewBox="0 0 24 24"><path d="M17,3H7A2,2 0 0,0 5,5V21L12,18L19,21V5A2,2 0 0,0 17,3M17,18L12,15.82L7,18V5H17V18M8,7H16V9H8V7M8,11H16V13H8V11Z" /></svg>书籍笔记</button>
+                                <button id="reflection-btn"><svg viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z" /></svg>读后感</button>
+                                <button id="stats-btn"><svg viewBox="0 0 24 24"><path d="M22,21H2V3H4V19H6V10H10V19H12V6H16V19H18V14H22V21Z" /></svg>阅读概览</button>
                                 <button id="tts-btn"><svg viewBox="0 0 24 24"><path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z" /></svg>朗读本页</button>
                             </div>
                         </div>
@@ -980,6 +1054,10 @@
                     </div>
                     <div class="settings-group">
                         <h3>主题定制</h3>
+                        <div class="theme-presets">
+                            <span class="theme-presets-label">配色预设</span>
+                            <div class="theme-preset-row" id="theme-preset-row"></div>
+                        </div>
                         <div class="theme-customization">
                             <div class="theme-controls">
                                 <div class="form-item"><label>背景颜色</label><input type="color" id="reader-bg-color"></div>
@@ -1044,13 +1122,14 @@
                     <div class="settings-group">
                         <h3>安装到桌面</h3>
                         <div class="form-item">
-                            <label>把「陪伴阅读」添加为手机 App，全屏无地址栏使用</label>
+                            <label>把「♡‧₊ ✧ ₊‧♡」添加为手机 App，全屏无地址栏使用</label>
                             <button id="install-app-btn" class="inline-btn action-btn">添加到桌面 / 安装 App</button>
                         </div>
                         <p style="font-size:12px;color:var(--secondary-text-color);margin:6px 0 0;">安卓 / 桌面 Chrome 可一键安装；iPhone 需在 Safari 中通过「分享 → 添加到主屏幕」，点按钮会有图文引导。</p>
                     </div>
                     <div class="settings-group">
                         <h3>数据管理</h3>
+                        <div class="backup-hint" id="backup-hint" style="display:none;"></div>
                         <div class="form-item">
                             <label>数据备份与恢复</label>
                             <div style="display: flex; gap: 10px;">
@@ -1210,6 +1289,101 @@
         </div>
     </div>
 
+    <div id="reflection-modal">
+        <div class="reflection-modal-content">
+            <h4 id="reflection-title">读后感</h4>
+            <div class="rf-row rf-author-row">
+                <label for="rf-author">由谁来写</label>
+                <select id="rf-author"></select>
+            </div>
+            <div class="rf-tabs">
+                <button type="button" class="rf-tab active" data-rf-tab="new">写一篇</button>
+                <button type="button" class="rf-tab" data-rf-tab="saved">已保存</button>
+            </div>
+
+            <div class="rf-body" id="rf-pane-new">
+                <div class="rf-row">
+                    <label for="rf-mode">范围</label>
+                    <select id="rf-mode">
+                        <option value="single">单章</option>
+                        <option value="range">第 x 章 ~ 第 x 章</option>
+                        <option value="whole">整本书（我们一起读完的全部）</option>
+                    </select>
+                </div>
+                <div class="rf-row" id="rf-single-row">
+                    <label for="rf-chapter">章节</label>
+                    <select id="rf-chapter"></select>
+                </div>
+                <div class="rf-row" id="rf-range-row" style="display:none;">
+                    <label for="rf-start">从</label>
+                    <select id="rf-start"></select>
+                    <label for="rf-end">到</label>
+                    <select id="rf-end"></select>
+                </div>
+                <div class="rf-row">
+                    <label for="rf-words">字数</label>
+                    <input type="number" id="rf-words" min="50" max="6000" step="50" value="500">
+                    <span class="rf-hint" style="margin:0;">字左右</span>
+                </div>
+                <div class="rf-row">
+                    <label for="rf-use-notes">参考我们读时的想法与点评</label>
+                    <input type="checkbox" id="rf-use-notes" checked>
+                </div>
+                <div class="rf-label">
+                    想让 TA 写点什么
+                    <button type="button" class="rf-mini-btn" id="rf-reset-prompt">恢复默认</button>
+                </div>
+                <textarea id="rf-prompt" placeholder="随便写点方向，比如：多聊聊你讨厌哪个角色..."></textarea>
+                <p class="rf-hint" id="rf-material-hint"></p>
+                <div class="rf-result" id="rf-result" style="display:none;">
+                    <div class="rf-result-meta" id="rf-result-meta"></div>
+                    <div class="rf-result-text" id="rf-result-text"></div>
+                    <div class="rf-result-actions">
+                        <button type="button" class="rf-mini-btn" id="rf-copy-btn">复制</button>
+                        <button type="button" class="rf-mini-btn" id="rf-export-txt-btn">导出 TXT</button>
+                        <button type="button" class="rf-mini-btn" id="rf-export-docx-btn">导出 DOCX</button>
+                        <button type="button" class="rf-mini-btn" id="rf-send-chat-btn">发到聊天里</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rf-body" id="rf-pane-saved" style="display:none;">
+                <div class="rf-saved-toolbar">
+                    <select id="rf-filter-author">
+                        <option value="mine">只看 TA 写的</option>
+                        <option value="all">全部作者</option>
+                    </select>
+                    <select id="rf-filter-book">
+                        <option value="current">只看本书</option>
+                        <option value="all">全部书籍</option>
+                    </select>
+                </div>
+                <div class="rf-saved-count" id="rf-saved-count"></div>
+                <div id="rf-list"></div>
+                <div class="rf-pager" id="rf-pager" style="display:none;">
+                    <button type="button" class="rf-mini-btn" id="rf-prev-page">上一页</button>
+                    <span class="rf-page-info" id="rf-page-info"></span>
+                    <button type="button" class="rf-mini-btn" id="rf-next-page">下一页</button>
+                </div>
+            </div>
+
+            <div class="reflection-modal-buttons">
+                <button id="close-reflection-btn" class="reader-btn" style="background-color: #aaa;">关闭</button>
+                <button id="rf-generate-btn" class="reader-btn">让 TA 写</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="stats-modal">
+        <div class="stats-modal-content">
+            <h4 id="stats-title">阅读概览</h4>
+            <div id="stats-body"></div>
+            <div class="stats-modal-buttons">
+                <button id="close-stats-btn" class="reader-btn" style="background-color: #aaa;">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <div id="summary-progress-modal">
         <div class="summary-progress-header">
             <h5 id="summary-progress-title">生成摘要</h5>
@@ -1266,8 +1440,8 @@
         const icon512 = makeIcon(512);
         
         const manifest = {
-            "name": "陪伴阅读",
-            "short_name": "伴读",
+            "name": "♡‧₊ ✧ ₊‧♡",
+            "short_name": "♡‧₊ ✧ ₊‧♡",
             "start_url": ".",
             "display": "standalone",
             "background_color": "#e0eee8",
@@ -1335,6 +1509,46 @@
             closeNotesBtn: document.getElementById('close-notes-btn'),
             exportNotesTxtBtn: document.getElementById('export-notes-txt-btn'),
             exportNotesDocxBtn: document.getElementById('export-notes-docx-btn'),
+            reflectionBtn: document.getElementById('reflection-btn'),
+            reflectionModal: document.getElementById('reflection-modal'),
+            reflectionTitle: document.getElementById('reflection-title'),
+            rfTabs: document.querySelectorAll('.rf-tab'),
+            rfAuthor: document.getElementById('rf-author'),
+            rfFilterAuthor: document.getElementById('rf-filter-author'),
+            rfFilterBook: document.getElementById('rf-filter-book'),
+            rfSavedCount: document.getElementById('rf-saved-count'),
+            rfPager: document.getElementById('rf-pager'),
+            rfPrevPage: document.getElementById('rf-prev-page'),
+            rfNextPage: document.getElementById('rf-next-page'),
+            rfPageInfo: document.getElementById('rf-page-info'),
+            rfPaneNew: document.getElementById('rf-pane-new'),
+            rfPaneSaved: document.getElementById('rf-pane-saved'),
+            rfMode: document.getElementById('rf-mode'),
+            rfSingleRow: document.getElementById('rf-single-row'),
+            rfRangeRow: document.getElementById('rf-range-row'),
+            rfChapter: document.getElementById('rf-chapter'),
+            rfStart: document.getElementById('rf-start'),
+            rfEnd: document.getElementById('rf-end'),
+            rfWords: document.getElementById('rf-words'),
+            rfUseNotes: document.getElementById('rf-use-notes'),
+            rfPrompt: document.getElementById('rf-prompt'),
+            rfResetPrompt: document.getElementById('rf-reset-prompt'),
+            rfMaterialHint: document.getElementById('rf-material-hint'),
+            rfResult: document.getElementById('rf-result'),
+            rfResultMeta: document.getElementById('rf-result-meta'),
+            rfResultText: document.getElementById('rf-result-text'),
+            rfCopyBtn: document.getElementById('rf-copy-btn'),
+            rfExportTxtBtn: document.getElementById('rf-export-txt-btn'),
+            rfExportDocxBtn: document.getElementById('rf-export-docx-btn'),
+            rfSendChatBtn: document.getElementById('rf-send-chat-btn'),
+            rfList: document.getElementById('rf-list'),
+            rfGenerateBtn: document.getElementById('rf-generate-btn'),
+            closeReflectionBtn: document.getElementById('close-reflection-btn'),
+            statsBtn: document.getElementById('stats-btn'),
+            statsModal: document.getElementById('stats-modal'),
+            statsTitle: document.getElementById('stats-title'),
+            statsBody: document.getElementById('stats-body'),
+            closeStatsBtn: document.getElementById('close-stats-btn'),
             tocBtn: document.getElementById('toc-btn'),
             tocPanel: document.getElementById('toc-panel'),
             tocOverlay: document.getElementById('toc-overlay'),
@@ -1519,11 +1733,14 @@
                     bookEncoding: 'GBK',
                     autoGenerateSummaries: false,
                     paginationMode: 'scroll', // 'scroll' or 'flip'
+                    reflectionWords: 500,     // 读后感默认字数
+                    reflectionPrompt: '',     // 读后感自定义提示词（空=用默认）
                 }
             },
             books: {},
             activeBookId: null,
             summaries: {},
+            reflections: {},   // { 书名: [ {id, createdAt, scopeLabel, words, prompt, text} ] }
             memories: [],
             memoryMeta: { lastSummarizedTimestamp: 0 },
             characters: { list: [], activeId: null }, // AI 角色库（每个角色独立聊天与记忆）
@@ -1552,7 +1769,12 @@
                 visibleParas: null, // Set：当前与视口相交的段落下标
                 paraObserver: null, // IntersectionObserver
                 progressRaf: 0,     // 进度刷新的 rAF 句柄，用于节流
-                rendering: false,   // 渲染中标记，避免滚动回调重入
+                rendering: false,   // 渲染中标记，避免滚动重入
+                // 待恢复的阅读位置。启动时阅读页是隐藏的（默认停在聊天页），
+                // 隐藏元素没有布局，offsetTop 全是 0、scrollTop 也赋不进去，
+                // 所以那一刻无法定位。这里先把目标存起来，等阅读页真正可见时再精确恢复。
+                pendingRestore: null, // null | { para, offset, flipPage }
+                lastRestoreAt: 0,     // 最近一次精确恢复的时刻，用于避免兜底逻辑覆盖它
             },
             longPressTimer: null,
             selection: {
@@ -1687,7 +1909,16 @@
                     if (min !== Infinity) state.reading.curPara = min;
                 }
                 scheduleProgressUpdate();
-            }, { root: dom.readerContentWrapper, threshold: 0 });
+            }, {
+                root: dom.readerContentWrapper,
+                // 滚动模式：只在顶部留一道负边距，段落必须「实际延伸到屏幕上沿往下一点」
+                // 才算当前段。否则上一段只剩最后一两行挂在屏幕最顶端（1px 也算相交）时，
+                // 它会因下标最小而被当成 curPara，导致进度、章节和下次恢复都往前偏一整段。
+                // 翻页模式不能用这个负边距：多列排版下一页就是一整列，
+                // 页首那段若很短会被整个排除，反而让章节名和进度提前跳到下一段。
+                rootMargin: isFlipMode() ? '0px' : '-10% 0px 0px 0px',
+                threshold: 0
+            });
             return state.reading.paraObserver;
         };
         const observePara = (el) => { try { ensureParaObserver().observe(el); } catch (e) {} };
@@ -1837,15 +2068,68 @@
             return !!document.getElementById(`para-id-${idx}`);
         };
 
+        // ===== 翻页模式的页码定位 =====
+        // 多列排版下，一个长段落会横跨好几列（好几页），它的元素盒子也跨列，
+        // 所以 scrollIntoView 只能回到「这一段开始的那一页」，而不是你真正停下的那一页。
+        // 因此翻页模式必须额外记住页码（scrollLeft / 一页宽度），恢复时直接定位。
+        const getFlipPage = () => {
+            if (!isFlipMode()) return 0;
+            const w = dom.readerContentWrapper;
+            const pw = w.clientWidth || 1;
+            return Math.max(0, Math.round(w.scrollLeft / pw));
+        };
+        // 跳到指定页；排版变化（字号/屏幕）导致总页数变少时会夹到最后一页，不会停在空白处
+        const applyFlipPage = (page) => {
+            const w = dom.readerContentWrapper;
+            const pw = w.clientWidth || 1;
+            const maxLeft = Math.max(0, w.scrollWidth - pw);
+            w.scrollLeft = Math.max(0, Math.min((page || 0) * pw, maxLeft));
+        };
+
+        // 阅读页此刻是否真的有布局（隐藏时宽高为 0，任何定位都会失效）
+        const isReaderVisible = () => {
+            const v = document.getElementById('reader-view');
+            if (!v || !v.classList.contains('active')) return false;
+            const w = dom.readerContentWrapper;
+            return !!w && (w.clientHeight > 0 || w.clientWidth > 0);
+        };
+
+        // 执行一次精确定位：段落 + 段内偏移（滚动模式）/ 页码（翻页模式）
+        const restoreReadingPosition = ({ para = 0, offset = 0, flipPage = 0 } = {}) => {
+            if (!scrollToPara(para, { offset })) return false;
+            if (isFlipMode() && flipPage > 0) applyFlipPage(flipPage);
+            // 记下时刻：switchView 的延迟回调靠它判断「刚刚已经精确恢复过了」，
+            // 从而不再用只带段落下标的兜底逻辑把位置覆盖掉（会丢偏移/页码）。
+            state.reading.lastRestoreAt = Date.now();
+            updateReadingProgress();
+            return true;
+        };
+        // 刚刚（400ms 内）完成过精确恢复
+        const justRestored = () => Date.now() - (state.reading.lastRestoreAt || 0) < 400;
+
+        // 若存在「待恢复」的位置且阅读页已可见，就把它兑现（只兑现一次）
+        const consumePendingRestore = () => {
+            const p = state.reading.pendingRestore;
+            if (!p || !isReaderVisible()) return false;
+            state.reading.pendingRestore = null;
+            return restoreReadingPosition(p);
+        };
+
         // 滚动/翻页到指定段落
-        const scrollToPara = (index, { smooth = false } = {}) => {
+        const scrollToPara = (index, { smooth = false, offset = 0 } = {}) => {
             if (!ensureParaRendered(index)) return false;
             const el = document.getElementById(`para-id-${index}`);
             if (!el) return false;
             if (isFlipMode()) {
                 el.scrollIntoView({ block: 'nearest', inline: 'start' });
             } else {
-                const target = Math.max(0, el.offsetTop - 2);
+                // offset：已滚过该段顶部的像素数，用于把位置恢复到段落内部（长段落必需）。
+                // 有 offset 时必须以「段顶」为基准精确相加——要和 getCurParaOffset 的基准完全一致，
+                // 否则每次切走再切回都会少 2px，反复切换会累积漂移。
+                // 无 offset 时（目录跳转 / 搜索定位）保留 2px 留白，让正文不贴着屏幕上沿。
+                const target = offset
+                    ? Math.max(0, el.offsetTop + offset)
+                    : Math.max(0, el.offsetTop - 2);
                 if (smooth) dom.readerContentWrapper.scrollTo({ top: target, behavior: 'smooth' });
                 else dom.readerContentWrapper.scrollTop = target;
             }
@@ -2044,6 +2328,15 @@
             const prevActive = document.querySelector('.view.active');
             if (prevActive && prevActive.id === 'reader-view' && viewId !== 'reader-view') {
                 await saveCurrentBookProgress();
+                // 记下离开时的精确位置：切回来时阅读页要重新布局，
+                // 光靠段落下标会丢掉段内偏移与页码，回来就会往前跳。
+                if (getActiveBook()) {
+                    state.reading.pendingRestore = {
+                        para: state.reading.curPara || 0,
+                        offset: getCurParaOffset(),
+                        flipPage: getFlipPage(),
+                    };
+                }
                 hideStatusBar();
             }
             dom.views.forEach(v => v.classList.remove('active'));
@@ -2064,9 +2357,15 @@
                     const activeBook = getActiveBook();
                     if(activeBook) {
                         applyPaginationMode(); // Ensure correct mode
-                        // 虚拟化渲染后按「段落下标」恢复位置，比像素更可靠（改字号也不会跑偏）
-                        if (state.reading.winEnd > state.reading.winStart) recalibrateSpacers();
-                        else scrollToPara(state.reading.curPara || activeBook.lastParaIndex || 0);
+                        // 启动时阅读页是隐藏的，位置定不了，会留下 pendingRestore；
+                        // 这里是它第一次真正可见，优先把上次的进度精确兑现（含段内偏移 / 页码）。
+                        // 若刚刚已由 displayBookContent 精确恢复过，则什么都不做——
+                        // 否则下面只带段落下标的兜底会把偏移与页码抹掉。
+                        if (!consumePendingRestore() && !justRestored()) {
+                            // 虚拟化渲染后按「段落下标」恢复位置，比像素更可靠（改字号也不会跑偏）
+                            if (!isFlipMode() && state.reading.winEnd > state.reading.winStart) recalibrateSpacers();
+                            else scrollToPara(state.reading.curPara || activeBook.lastParaIndex || 0);
+                        }
                         updateReadingProgress();
                     }
                 }, 100);
@@ -2086,6 +2385,8 @@
                     : '设置';
             }
             dom.settingsView.classList.add('active');
+            // 每次打开设置刷新一次备份状态（只读一个时间戳，开销极小）
+            renderBackupHint();
         };
         const showCharacterSettings = () => showSettings('char');
         const hideSettings = () => {
@@ -2529,6 +2830,7 @@
 
             applyPaginationMode();
             updateThemePreview();
+            renderThemePresets();
         };
 
         /* ============ 多角色 / 多身份 档案系统 ============ */
@@ -2631,7 +2933,7 @@
             applyCharacterToSettings(target);
             await loadChatHistory();
             await loadMemories();
-            if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara }); }
+            if (getActiveBook()) { const fp = getFlipPage(); await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara, flipPage: fp }); }
             applySettings();
             renderProfiles();
             addSystemMessage(`已切换到角色「${target.name}」`, true);
@@ -2670,7 +2972,7 @@
             applyCharacterToSettings(c);
             await loadChatHistory();   // 新角色无历史，会清空聊天区
             await loadMemories();
-            if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara }); }
+            if (getActiveBook()) { const fp = getFlipPage(); await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara, flipPage: fp }); }
             applySettings();
             hideProfilesModal();
             showCharacterSettings();
@@ -2702,10 +3004,15 @@
             if (state.characters.list.length <= 1) { alert('至少要保留一个 AI 角色'); return; }
             const target = state.characters.list.find(c => c.id === id);
             if (!target) return;
-            if (!confirm(`确定删除角色「${target.name}」？该角色独立的聊天记录与记忆也会一并删除。`)) return;
+            if (!confirm(`确定删除角色「${target.name}」？该角色独立的聊天记录、记忆与书中批注也会一并删除。`)) return;
             state.characters.list = state.characters.list.filter(c => c.id !== id);
             await localforage.removeItem('chat_' + id);
             await localforage.removeItem('memories_' + id);
+            // 批注是按「角色 × 书」存储的，删角色时要把它在每本书下的批注都清掉，
+            // 否则会永久残留一批再也访问不到的孤儿数据。
+            for (const bookId of Object.keys(state.books || {})) {
+                await localforage.removeItem(`comments_${id}_${bookId}`);
+            }
             const wasActive = state.characters.activeId === id;
             if (wasActive) state.characters.activeId = state.characters.list[0].id;
             await saveCharacters();
@@ -2713,7 +3020,7 @@
                 applyCharacterToSettings(getActiveCharacter());
                 await loadChatHistory();
                 await loadMemories();
-                if (getActiveBook()) { await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara }); }
+                if (getActiveBook()) { const fp = getFlipPage(); await loadCommentsForActiveBook(); displayBookContent({ anchorPara: state.reading.curPara, flipPage: fp }); }
                 applySettings();
             }
             renderProfiles();
@@ -2835,6 +3142,50 @@
                 rebuildReaderWindow();
             }
         }, 200));
+
+        // ===== 配色预设：一键切换背景/字色/高亮色，省去逐项手调 =====
+        const THEME_PRESETS = [
+            { id: 'paper',  name: '纸白', bg: '#fdfcfa', font: '#333333', ai: '#a3ccc4', user: '#f7c5a8' },
+            { id: 'cream',  name: '米黄', bg: '#f5ecd9', font: '#4a3f35', ai: '#b3a07a', user: '#d9a86c' },
+            { id: 'green',  name: '豆绿', bg: '#e3ede3', font: '#33413a', ai: '#7fa98f', user: '#c99b6e' },
+            { id: 'night',  name: '夜间', bg: '#2b2b2f', font: '#c8c8cc', ai: '#5f8c84', user: '#a3765a' },
+            { id: 'black',  name: '纯黑', bg: '#000000', font: '#9a9a9e', ai: '#4a6f69', user: '#7d5a45' },
+        ];
+        // 预设与当前取色器的值是否一致（用于高亮「当前」）
+        const matchThemePreset = () => {
+            const norm = (v) => String(v || '').toLowerCase();
+            return (THEME_PRESETS.find(p =>
+                norm(p.bg) === norm(dom.readerBgColor.value) &&
+                norm(p.font) === norm(dom.readerFontColor.value) &&
+                norm(p.ai) === norm(dom.readerCommentColor.value) &&
+                norm(p.user) === norm(dom.readerUserCommentColor.value)
+            ) || {}).id || '';
+        };
+        const renderThemePresets = () => {
+            const row = document.getElementById('theme-preset-row');
+            if (!row) return;
+            const activeId = matchThemePreset();
+            row.innerHTML = '';
+            THEME_PRESETS.forEach(p => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'theme-preset' + (p.id === activeId ? ' active' : '');
+                b.innerHTML = `<span class="tp-dot" style="background:${p.bg};box-shadow:inset 0 0 0 6px ${p.font}33"></span>${p.name}`;
+                b.addEventListener('click', () => applyThemePreset(p.id));
+                row.appendChild(b);
+            });
+        };
+        // 只改 4 个颜色，字号/行距/边距/字体/背景图都保持用户自己的设置
+        const applyThemePreset = (id) => {
+            const p = THEME_PRESETS.find(x => x.id === id);
+            if (!p) return;
+            dom.readerBgColor.value = p.bg;
+            dom.readerFontColor.value = p.font;
+            dom.readerCommentColor.value = p.ai;
+            dom.readerUserCommentColor.value = p.user;
+            updateThemePreview();
+            renderThemePresets();
+        };
 
         const updateThemePreview = () => {
             dom.themePreview.style.backgroundColor = dom.readerBgColor.value;
@@ -3025,8 +3376,9 @@
         };
 
         // 将 {{char}} / {{user}} 占位符替换为实际姓名（仿酒馆写法）
-        const applyPlaceholders = (str) => (str || '')
-            .replace(/\{\{char\}\}/gi, state.settings.aiName || '角色')
+        // charNameOverride：让「非当前激活角色」也能正确替换 {{char}}（如读后感指定作者）
+        const applyPlaceholders = (str, charNameOverride) => (str || '')
+            .replace(/\{\{char\}\}/gi, charNameOverride || state.settings.aiName || '角色')
             .replace(/\{\{user\}\}/gi, state.settings.userName || '用户');
 
         // 清理 AI 高频滥用的"哈"语气词（提示词约束不稳，这里在展示前做兜底处理）
@@ -3084,8 +3436,10 @@
         };
 
         // 根据扫描文本，挑选命中的世界书条目（常驻条目始终注入）
-        const getRelevantWorldInfo = (scanText) => {
-            const wb = Array.isArray(state.settings.worldBook) ? state.settings.worldBook : [];
+        // wbOverride：指定角色的世界书（不传则用当前激活角色的）
+        const getRelevantWorldInfo = (scanText, wbOverride) => {
+            const src = wbOverride !== undefined && wbOverride !== null ? wbOverride : state.settings.worldBook;
+            const wb = Array.isArray(src) ? src : [];
             if (!wb.length) return '';
             const text = (scanText || '').toLowerCase();
             const picked = [];
@@ -3118,10 +3472,15 @@
         };
 
         // 构建角色扮演式 system prompt（对话与阅读评论共用）
-        const buildRoleplaySystemContent = ({ scanText = '', sceneExtra = '', lengthOverride = '' } = {}) => {
+        // charOverride：指定由「另一个角色卡」来扮演（读后感可选作者用），
+        //   形如 { name, prompt, worldBook, memories }；不传时完全沿用当前激活角色，行为与从前一致。
+        const buildRoleplaySystemContent = ({ scanText = '', sceneExtra = '', lengthOverride = '', charOverride = null } = {}) => {
             const s = state.settings;
             const rp = s.rp || {};
-            const charName = s.aiName || '伴侣';
+            const charName = (charOverride && charOverride.name) || s.aiName || '伴侣';
+            const charPrompt = charOverride ? (charOverride.prompt || '') : s.aiPrompt;
+            const charWorldBook = charOverride ? charOverride.worldBook : null;
+            const charMemories = charOverride ? (charOverride.memories || []) : state.memories;
             const userName = s.userName || '我';
             const lengthMap = {
                 short: '长短随心，多数时候很短——有时只是一两个字、一个语气词、一句半句；偶尔才两三句。别每条都一样长。',
@@ -3140,17 +3499,17 @@
                 parts.push(`【输出格式·最高优先级·纯聊天模式】\n你现在是在用手机发消息，而不是在写小说。你的每一次输出都必须是「一条聊天消息的文字内容本身」，除此之外什么都不许有。\n严格禁止（无论多短、无论出现在开头中间还是结尾）：\n1. 禁止任何括号内的描写，包括（）、()、【】、[]、{}、<>；\n2. 禁止用 * 或 ** 包裹的动作旁白，如 *轻笑*、*挑眉*；\n3. 禁止任何神态、动作、表情、语气、心理、环境、场景的第三人称描述，例如"（笑）""（叹气）""（沉默了一会儿）""（挑眉）""（心里有点酸）""（放下书）"这类内容一律不准出现；\n4. 禁止旁白、舞台指示、状态标注、括号补充说明、括号里的解释；\n5. 禁止在句首写"${charName}："这样的名字前缀。\n允许的表达方式只有：说出来的话本身。情绪只能通过用词、标点、语气、停顿（如"……"）、或少量 emoji 来体现，而不是靠描写动作。\n如果你很想表达一个动作或神态，就把它改写成口语说出来（例如不要写"（笑）"，而是说"哈哈"之外的具体调侃、或者直接说"你别逗我了"；不要写"（沉默）"，而是回一句"……"）。\n再次强调：输出里绝对不能出现"（"、"）"、"("、")"、"*" 这些用于描写的符号。`);
             }
 
-            parts.push(`【你的角色：${charName}】（这是你的核心设定，你的每一句话、语气、用词、态度都必须严格贴合这个人物，让人一眼就认出是"${charName}"在说话）\n${applyPlaceholders(s.aiPrompt) || '（未设定，请自行塑造一个自然、有温度、有鲜明个性的人物。）'}`);
+            parts.push(`【你的角色：${charName}】（这是你的核心设定，你的每一句话、语气、用词、态度都必须严格贴合这个人物，让人一眼就认出是"${charName}"在说话）\n${applyPlaceholders(charPrompt, charName) || '（未设定，请自行塑造一个自然、有温度、有鲜明个性的人物。）'}`);
 
-            const persona = applyPlaceholders(s.userPersona);
+            const persona = applyPlaceholders(s.userPersona, charName);
             parts.push(`【对方：${userName}】\n${persona || '（对方的信息暂时未知，可以在互动中自然地了解 TA。）'}`);
 
-            const world = getRelevantWorldInfo(scanText);
+            const world = getRelevantWorldInfo(scanText, charWorldBook);
             if (world) parts.push(`【世界设定 / 背景知识】（以下为与当前情境相关的设定，请自然地融入言行，切勿生硬复述或直接罗列）\n${world}`);
 
-            if ((s.memory || {}).enabled !== false && Array.isArray(state.memories) && state.memories.length) {
+            if ((s.memory || {}).enabled !== false && Array.isArray(charMemories) && charMemories.length) {
                 // 取最近若干条记忆，并限制总长度，避免占用过多上下文
-                let memTexts = state.memories.slice(-150).map(m => `- ${m.text}`);
+                let memTexts = charMemories.slice(-150).map(m => `- ${m.text}`);
                 let joined = memTexts.join('\n');
                 while (joined.length > 12500 && memTexts.length > 1) {
                     memTexts.shift();
@@ -3434,17 +3793,31 @@
             hideBookListModal();
             // 必须先把阅读页显示出来再渲染：隐藏状态下测不到段落高度，占位条会算错
             await switchView('reader-view');
-            displayBookContent({ anchorPara: state.books[bookId].lastParaIndex || 0 });
+            // 回到这本书上次读的「确切位置」：段落 + 段内偏移 + 翻页页码都带上。
+            // 不能只传 anchorPara，那会被当成目录跳转而落到段首。
+            const b = state.books[bookId];
+            displayBookContent({
+                anchorPara: b.lastParaIndex || 0,
+                anchorOffset: b.lastParaOffset || 0,
+                flipPage: b.lastFlipPage || 0,
+            });
         };
         const deleteBook = async (bookId) => {
             if (!state.books[bookId]) return;
-            if (confirm(`确定要删除《${state.books[bookId].title}》吗？`)) {
-                delete state.summaries[state.books[bookId].title];
+            const bookTitle = state.books[bookId].title;
+            if (confirm(`确定要删除《${bookTitle}》吗？`)) {
+                delete state.summaries[bookTitle];
+                // 连同这本书的读后感一起清理，避免留下无书可依的孤儿数据
+                if (state.reflections && state.reflections[bookTitle]) delete state.reflections[bookTitle];
                 delete state.books[bookId];
                 await localforage.removeItem('book_' + bookId);
                 await localforage.removeItem('bookprog_' + bookId);
-                // 删除该书在所有角色下的批注
-                (state.characters.list || []).forEach(async c => { await localforage.removeItem(`comments_${c.id}_${bookId}`); });
+                // 删除该书在所有角色下的批注。
+                // 注意：forEach 不会等待 async 回调，必须用 for...of 真正逐个 await，
+                // 否则删完立刻导出备份，可能把还没删掉的批注一起导出去。
+                for (const c of (state.characters.list || [])) {
+                    await localforage.removeItem(`comments_${c.id}_${bookId}`);
+                }
                 if (state.activeBookId === bookId) {
                     state.activeBookId = null;
                     await localforage.removeItem('lastActiveBookId');
@@ -3452,6 +3825,7 @@
                 }
                 await saveBookIndex();
                 await localforage.setItem('readingCompanionSummaries', state.summaries);
+                await saveReflections();
                 renderBookList();
             }
         };
@@ -3477,6 +3851,16 @@
                 Math.max(0, activeBook.paragraphs.length - 1)
             ));
             state.reading.curPara = anchor;
+            // 只有「恢复上次进度」时才沿用段内偏移；
+            // 显式指定 anchorPara（目录跳转 / 搜索定位 / 新书）应当落在段首。
+            const anchorOffset = (typeof opts.anchorOffset === 'number')
+                ? opts.anchorOffset
+                : (typeof opts.anchorPara === 'number' ? 0 : (activeBook.lastParaOffset || 0));
+            // 翻页模式的页码：只有「回到上次进度」时才沿用，
+            // 目录跳转 / 搜索定位这类明确指定了别的段落时，应落到那一段所在的页。
+            const flipPage = (typeof opts.flipPage === 'number')
+                ? opts.flipPage
+                : (anchor === (activeBook.lastParaIndex || 0) ? (activeBook.lastFlipPage || 0) : 0);
             if (isFlipMode()) {
                 const segStart = Math.floor(anchor / FLIP_SEGMENT) * FLIP_SEGMENT;
                 renderParaWindow(segStart, segStart + FLIP_SEGMENT);
@@ -3485,6 +3869,9 @@
                 renderParaWindow(start, start + PARA_WINDOW);
             }
             renderTOC();
+            // 无论此刻能否定位，都先登记目标位置；
+            // 阅读页隐藏时（启动默认在聊天页）这里定不了位，留给切到阅读页时兑现。
+            state.reading.pendingRestore = { para: anchor, offset: anchorOffset, flipPage };
             setTimeout(() => {
                 applyPaginationMode();
                 if (!isFlipMode()) {
@@ -3496,8 +3883,13 @@
                     top.style.height = `${Math.round(state.reading.winStart * avg)}px`;
                     bottom.style.height = `${Math.round((total - state.reading.winEnd) * avg)}px`;
                 }
-                scrollToPara(anchor);
-                updateReadingProgress();
+                // 阅读页可见才真正定位；隐藏时保留 pendingRestore，等切过来再兑现
+                if (isReaderVisible()) {
+                    state.reading.pendingRestore = null;
+                    restoreReadingPosition({ para: anchor, offset: anchorOffset, flipPage });
+                } else {
+                    updateReadingProgress();
+                }
             }, 0);
         };
         
@@ -3518,10 +3910,41 @@
             const activeBook = getActiveBook();
             if (!activeBook || activeBook.paragraphs.length === 0) return;
             activeBook.toc = [];
-            const chapterRegex = /^(第\s*[一二三四五六七八九十百千万零〇\d]+\s*[章回节卷部])|^(Chapter\s*\d+)/im;
+            // 章节标题识别。识别失败会导致全书只有一个「书籍开头」，
+            // 连带让章节摘要、读后感选章、章节滑块全部失效，所以尽量覆盖常见写法。
+            // 先剥掉行首的装饰符号（【】★◆※= - 空格等），再逐条规则匹配。
+            const stripDecor = (s) => s
+                .replace(/^[\s\u3000]*[【\[（(<《〈«‹★☆◆◇■□●○▲△※*=—\-_~·]+/, '')
+                .replace(/[】\]）)>》〉»›★☆◆◇■□●○▲△※*=—\-_~·]+[\s\u3000]*$/, '')
+                .trim();
+            const CN_NUM = '零〇一二三四五六七八九十百千万两廿';
+            const patterns = [
+                // 第X章 / 第X回 / 第X节 / 第X卷 / 第X部 / 第X篇 / 第X话 / 第X幕
+                new RegExp(`^第\\s*[${CN_NUM}\\d]+\\s*[章回节卷部篇话幕折]`, 'i'),
+                // 卷一 / 上部 / 下篇（量词在前）
+                new RegExp(`^[卷部篇章]\\s*[${CN_NUM}\\d]+`),
+                // 序章 / 楔子 / 尾声 / 后记 / 番外 / 终章 / 引子 / 前言 / 结语 / 附录
+                /^(序章|序言|序|楔子|引子|前言|自序|尾声|终章|结语|结局|后记|附录|番外|外传|间章|插曲|后日谈)/,
+                // Chapter 12 / CHAPTER XII / Prologue / Epilogue
+                /^(chapter|prologue|epilogue|part|volume|book)\b/i,
+                // 01 相遇 / 1. 相遇 / 1、相遇 / 1 相遇（纯数字编号开头，需带标题）
+                /^\d{1,4}\s*[.、：:．,，]\s*\S/,
+                /^\d{1,4}\s+\S/,
+                // 独立成行的纯数字：限 3 位以内，避免把 "2026" 这类年份当成章节号
+                /^\d{1,3}$/,
+                // 一、相遇 / 二 相遇（中文数字编号）
+                new RegExp(`^[${CN_NUM}]{1,6}\\s*[、.：:．]\\s*\\S`),
+            ];
             activeBook.paragraphs.forEach((paraText, index) => {
-                const trimmedLine = paraText.trim();
-                if (chapterRegex.test(trimmedLine) && trimmedLine.length < 30) { activeBook.toc.push({ title: trimmedLine, paraIndex: index }); }
+                const raw = paraText.trim();
+                // 标题一般很短；放宽到 40 字以内，但要求不含句末标点（避免把正文长句当标题）
+                if (!raw || raw.length > 40) return;
+                const line = stripDecor(raw);
+                if (!line || line.length > 36) return;
+                if (/[。！？；…]$/.test(line)) return;         // 以句末标点收尾的基本是正文
+                if (patterns.some(re => re.test(line))) {
+                    activeBook.toc.push({ title: line, paraIndex: index });
+                }
             });
             if (activeBook.toc.length === 0 && activeBook.paragraphs.length > 0) { activeBook.toc.push({ title: '书籍开头', paraIndex: 0 }); }
         };
@@ -3547,12 +3970,28 @@
             getChatResponse({ userMessage: command });
         };
         
+        // 当前滚动位置相对 curPara 段顶部的像素偏移。
+        // 只记到「第几段」的话，长段落恢复时会退回段首，看起来就是"每次都往前跳一点"。
+        const getCurParaOffset = () => {
+            if (isFlipMode()) return 0;
+            const el = document.getElementById(`para-id-${state.reading.curPara || 0}`);
+            if (!el) return 0;
+            const off = Math.round(dom.readerContentWrapper.scrollTop - el.offsetTop);
+            // 自限幅：正向不超过该段自身高度，反向不超过一屏，避免窗口重建瞬间取到异常值
+            const max = el.offsetHeight || 0;
+            const min = -(dom.readerContentWrapper.clientHeight || 0);
+            return Math.max(min, Math.min(max, off));
+        };
+
         const saveCurrentBookProgress = async () => {
             const activeBook = getActiveBook();
             if (!activeBook) return;
             activeBook.lastScrollTop = dom.readerContentWrapper.scrollTop;
             activeBook.lastScrollLeft = dom.readerContentWrapper.scrollLeft;
             activeBook.lastParaIndex = state.reading.curPara || 0;
+            activeBook.lastParaOffset = getCurParaOffset();
+            // 翻页模式下记住页码；滚动模式不覆盖，免得切回翻页时丢了原来的页
+            if (isFlipMode()) activeBook.lastFlipPage = getFlipPage();
             await saveBookProgress(activeBook.id);
         };
 
@@ -3579,6 +4018,8 @@
                 lastScrollTop: b.lastScrollTop || 0,
                 lastScrollLeft: b.lastScrollLeft || 0,
                 lastParaIndex: b.lastParaIndex || 0,
+                lastParaOffset: b.lastParaOffset || 0,
+                lastFlipPage: b.lastFlipPage || 0,
             });
         };
         // 书架索引（只含 id + 标题，启动时无需读取全部正文）
@@ -3632,6 +4073,8 @@
                 }
                 b.lastParaIndex = Math.max(0, Math.min(guess, Math.max(0, b.paragraphs.length - 1)));
             }
+            b.lastParaOffset = typeof prog.lastParaOffset === 'number' ? prog.lastParaOffset : 0;
+            b.lastFlipPage = typeof prog.lastFlipPage === 'number' ? prog.lastFlipPage : 0;
             b._loaded = true;
             return b;
         };
@@ -3797,13 +4240,19 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             return getCommentOnQuote(text, targetPara);
         };
 
-        // 从数组中均匀取 n 个元素（用于在章节里分散选段）
-        const pickEvenlySpaced = (arr, n) => {
+        // 从数组中挑 n 个元素：先均分成 n 段，再在每段内部随机取一个。
+        // 这样既能散布在整章各处，又不会每次都落在固定位置（纯等距会导致每点一次就整体后移一格）。
+        const pickSpreadRandom = (arr, n) => {
+            if (!arr.length) return [];
             if (n >= arr.length) return arr.slice();
-            if (n <= 1) return [arr[Math.floor(arr.length / 2)]];
-            const step = (arr.length - 1) / (n - 1);
+            if (n <= 1) return [arr[Math.floor(Math.random() * arr.length)]];
+            const size = arr.length / n;
             const res = [];
-            for (let i = 0; i < n; i++) res.push(arr[Math.round(i * step)]);
+            for (let i = 0; i < n; i++) {
+                const from = Math.floor(i * size);
+                const to = Math.max(from + 1, Math.min(arr.length, Math.floor((i + 1) * size)));
+                res.push(arr[from + Math.floor(Math.random() * (to - from))]);
+            }
             return [...new Set(res)];
         };
 
@@ -3827,6 +4276,17 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 const id = p.dataset.paraId;
                 return activeBook.comments[id] && activeBook.comments[id].some(c => c.type === 'ai');
             };
+            // 紧挨着已评论段落的段（上一段或下一段已被评过），优先避开，
+            // 否则连点几次会一路顺着往下评，看起来像"每次都选下一段"
+            const nextToAiComment = (p) => {
+                const id = parseInt(p.dataset.paraId, 10);
+                if (Number.isNaN(id)) return false;
+                const commented = (x) => {
+                    const arr = activeBook.comments[x];
+                    return Array.isArray(arr) && arr.some(c => c.type === 'ai');
+                };
+                return commented(id - 1) || commented(id + 1);
+            };
             const inChapter = (p) => {
                 const id = parseInt(p.dataset.paraId, 10);
                 return id >= start && id < end;
@@ -3836,11 +4296,13 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             const pool = chapterParas.length ? chapterParas : allP;
             // 优先在「本章未评论」的段落里分散挑选；若都评论过则从本章全部段落里挑
             const uncommented = pool.filter(p => !hasAiComment(p));
-            const base = uncommented.length ? uncommented : pool;
+            // 再优先挑「不挨着已评论段落」的，候选太少时才放宽
+            const spacedOut = uncommented.filter(p => !nextToAiComment(p));
+            const base = spacedOut.length >= 2 ? spacedOut : (uncommented.length ? uncommented : pool);
 
-            // 挑选段数：随章节长度增加，最少 2 段、最多 10 段
-            const maxN = Math.min(10, Math.max(2, Math.ceil(base.length / 4)));
-            const targets = pickEvenlySpaced(base, Math.min(maxN, base.length));
+            // 挑选段数：至少 10 段，长章节随长度增加，最多 20 段（段落不够时以实际数量为准）
+            const maxN = Math.min(20, Math.max(10, Math.ceil(base.length / 4)));
+            const targets = pickSpreadRandom(base, Math.min(maxN, base.length));
             if (!targets.length) { addSystemMessage('本章暂时没有合适的段落可以点评'); return; }
 
             state.reading.commentingChapter = true;
@@ -4382,6 +4844,627 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             }
         };
 
+        // ===== 读后感 / 感想：自选章节范围，让伴侣写一篇长一点的感想 =====
+        const DEFAULT_REFLECTION_PROMPT = [
+            '想写什么就写什么，别端着，就当是随手写给我看的：',
+            '读完最直接的感受和情绪，哪儿看爽了、哪儿难受、哪儿烦、哪儿想笑；',
+            '顺着内容随便发散，某个细节让你想到了什么，联想到别的故事，或者自己经历过的事；',
+            'if 线猜想，要是当时某个人没那么选、某件事没发生，故事会歪到哪去；',
+            '对角色的喜恶，喜欢谁、烦谁、心疼谁、想踹谁一脚，可以偏心、可以刻薄；',
+            '对作者的看法，写得好不好、哪段偷懒了、看得出他偏爱谁、哪里在故意吊人；',
+            '对世界观和设定的琢磨，哪里有意思、哪里说不通、这套规则要是真的会怎样；',
+            '对后面剧情的预感，或者对结局的期待和不安；',
+            '也可以完全跑题，写你自己的心情、最近的事、和我一起读书这件事，甚至纯粹的走神；',
+            '总之什么都能写，不用分点、不用总结、不用升华，想到哪写到哪，说人话就行。',
+        ].join('\n');
+
+        let currentReflection = null; // 当前刚生成的那一篇（供复制/导出/发到聊天）
+
+        const rfEscHtml = (s) => String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        const getReflectionWords = () => {
+            const n = parseInt((state.settings.reading || {}).reflectionWords, 10);
+            return (n >= 50 && n <= 6000) ? n : 500;
+        };
+        const getReflectionPrompt = () => {
+            const p = (state.settings.reading || {}).reflectionPrompt;
+            return (typeof p === 'string' && p.trim()) ? p : DEFAULT_REFLECTION_PROMPT;
+        };
+
+        const saveReflections = async () => { await localforage.setItem('readingCompanionReflections', state.reflections); };
+        const loadReflections = async () => {
+            const saved = await localforage.getItem('readingCompanionReflections');
+            if (saved && typeof saved === 'object') state.reflections = saved;
+        };
+
+        // ——作者（角色卡）相关——
+        // 取读后感作者：优先用界面上选的，取不到则用当前激活角色
+        const getReflectionAuthor = () => {
+            const list = state.characters.list || [];
+            const id = (dom.rfAuthor && dom.rfAuthor.value) || state.characters.activeId;
+            return list.find(c => c.id === id) || getActiveCharacter() || null;
+        };
+        // 读取某个角色的长期记忆（非激活角色不在内存里，需要单独从本地库取）
+        const loadMemoriesForCharacter = async (charId) => {
+            if (!charId) return [];
+            if (charId === state.characters.activeId) return Array.isArray(state.memories) ? state.memories : [];
+            try {
+                const saved = await localforage.getItem('memories_' + charId);
+                if (saved && Array.isArray(saved.entries)) return saved.entries;
+            } catch (e) {}
+            return [];
+        };
+        const renderReflectionAuthorOptions = () => {
+            if (!dom.rfAuthor) return;
+            const list = state.characters.list || [];
+            dom.rfAuthor.innerHTML = list.map(c =>
+                `<option value="${rfEscHtml(c.id)}">${rfEscHtml(c.name || '未命名角色')}</option>`).join('');
+            const activeId = state.characters.activeId;
+            if (list.find(c => c.id === activeId)) dom.rfAuthor.value = activeId;
+            else if (list.length) dom.rfAuthor.value = list[0].id;
+        };
+
+        // 取某一章的正文（超长则截断）
+        const getChapterBodyText = (book, idx, maxLen) => {
+            const toc = book.toc || [];
+            if (!toc[idx]) return '';
+            const start = toc[idx].paraIndex || 0;
+            const end = toc[idx + 1] ? toc[idx + 1].paraIndex : (book.paragraphs || []).length;
+            const text = (book.paragraphs || []).slice(start, end).join('\n').trim();
+            return (maxLen && text.length > maxLen) ? text.slice(0, maxLen) + '…（后略）' : text;
+        };
+
+        // 汇总这段范围内我们留下的想法与点评，让感想能接上我们读时的反应
+        const collectReflectionNotes = (startPara, endPara) => {
+            const data = buildNotesData();
+            if (!data || !data.entries.length) return '';
+            const userName = state.settings.userName || '我';
+            const charName = state.settings.aiName || '你';
+            const picked = data.entries.filter(e => e.paraId >= startPara && e.paraId < endPara).slice(-60);
+            if (!picked.length) return '';
+            let out = picked.map(e => {
+                const who = e.type === 'user' ? userName : charName;
+                const q = e.quote ? `（读到「${e.quote.slice(0, 60)}」时）` : '';
+                return `- ${who}${q}：${(e.text || '').slice(0, 200)}`;
+            }).join('\n');
+            if (out.length > 3000) out = out.slice(-3000);
+            return out;
+        };
+
+        // 按范围拼装给 AI 的阅读材料：章节少就给正文，章节多就以摘要为主
+        const REFLECTION_MATERIAL_BUDGET = 14000;
+        const buildReflectionMaterial = (book, startIdx, endIdx) => {
+            const toc = book.toc || [];
+            const paragraphs = book.paragraphs || [];
+            if (!toc.length) {
+                // 没解析出目录的书：从全书均匀抽取若干片段
+                const picks = [];
+                const step = Math.max(1, Math.floor(paragraphs.length / 12));
+                for (let i = 0; i < paragraphs.length && picks.length < 12; i += step) {
+                    picks.push(paragraphs.slice(i, i + 12).join('\n').slice(0, 1000));
+                }
+                return { text: picks.join('\n……\n').slice(0, REFLECTION_MATERIAL_BUDGET), mode: 'sample', chapterCount: 0, missing: 0 };
+            }
+            const idxs = [];
+            for (let i = Math.max(0, startIdx); i <= Math.min(endIdx, toc.length - 1); i++) idxs.push(i);
+            const per = Math.floor(REFLECTION_MATERIAL_BUDGET / Math.max(1, idxs.length));
+            const sums = state.summaries[book.title] || {};
+            const parts = [];
+            if (per >= 800) {
+                idxs.forEach(i => parts.push(`【${toc[i].title}】\n${getChapterBodyText(book, i, per)}`));
+                return { text: parts.join('\n\n'), mode: 'full', chapterCount: idxs.length, missing: 0 };
+            }
+            let missing = 0;
+            idxs.forEach(i => {
+                const t = toc[i].title;
+                const sm = (sums[t] || '').trim();
+                if (sm) { parts.push(`【${t}】${sm}`); }
+                else { missing++; parts.push(`【${t}】${getChapterBodyText(book, i, 160)}`); }
+            });
+            idxs.slice(-2).forEach(i => parts.push(`【${toc[i].title}·原文片段】\n${getChapterBodyText(book, i, 2000)}`));
+            let text = parts.join('\n\n');
+            if (text.length > 16000) text = text.slice(-16000);
+            return { text, mode: 'summary', chapterCount: idxs.length, missing };
+        };
+
+        // 读取界面上选的范围
+        const getReflectionScope = (book) => {
+            const toc = book.toc || [];
+            const mode = dom.rfMode ? dom.rfMode.value : 'single';
+            if (!toc.length || mode === 'whole') {
+                return { startIdx: 0, endIdx: Math.max(0, toc.length - 1), label: '整本书' };
+            }
+            if (mode === 'single') {
+                const i = Math.min(toc.length - 1, Math.max(0, parseInt(dom.rfChapter.value, 10) || 0));
+                return { startIdx: i, endIdx: i, label: toc[i].title };
+            }
+            let s = Math.min(toc.length - 1, Math.max(0, parseInt(dom.rfStart.value, 10) || 0));
+            let e = Math.min(toc.length - 1, Math.max(0, parseInt(dom.rfEnd.value, 10) || 0));
+            if (s > e) { const t = s; s = e; e = t; }
+            return { startIdx: s, endIdx: e, label: s === e ? toc[s].title : `${toc[s].title} ~ ${toc[e].title}` };
+        };
+
+        const updateReflectionHint = () => {
+            const book = getActiveBook();
+            if (!book || !dom.rfMaterialHint) return;
+            const toc = book.toc || [];
+            if (!toc.length) { dom.rfMaterialHint.textContent = '这本书没有解析出目录，会从全书里抽取一些片段来写。'; return; }
+            const scope = getReflectionScope(book);
+            const count = Math.max(1, scope.endIdx - scope.startIdx + 1);
+            if (Math.floor(REFLECTION_MATERIAL_BUDGET / count) >= 800) {
+                dom.rfMaterialHint.textContent = `将参考这 ${count} 章的正文来写。`;
+            } else {
+                const sums = state.summaries[book.title] || {};
+                let missing = 0;
+                for (let i = scope.startIdx; i <= scope.endIdx && i < toc.length; i++) {
+                    if (!((sums[toc[i].title] || '').trim())) missing++;
+                }
+                dom.rfMaterialHint.textContent = `共 ${count} 章，正文太长，将以「章节摘要」为主、再附最后两章原文片段来写`
+                    + (missing ? `。其中 ${missing} 章还没有摘要，建议先去「章节摘要」生成，写出来会更贴合剧情。` : '。');
+            }
+        };
+
+        const renderReflectionChapterOptions = () => {
+            const book = getActiveBook();
+            const toc = (book && book.toc) || [];
+            const html = toc.map((c, i) => `<option value="${i}">${i + 1}. ${rfEscHtml(c.title)}</option>`).join('');
+            [dom.rfChapter, dom.rfStart, dom.rfEnd].forEach(sel => { if (sel) sel.innerHTML = html; });
+            if (!toc.length) {
+                if (dom.rfMode) dom.rfMode.value = 'whole';
+                return;
+            }
+            let cur = 0;
+            try { cur = Math.max(0, getCurrentChapterIndex()); } catch (e) { cur = 0; }
+            if (cur > toc.length - 1) cur = toc.length - 1;
+            if (dom.rfChapter) dom.rfChapter.value = String(cur);
+            if (dom.rfStart) dom.rfStart.value = '0';
+            if (dom.rfEnd) dom.rfEnd.value = String(cur);
+        };
+
+        const applyReflectionModeUI = () => {
+            const mode = dom.rfMode ? dom.rfMode.value : 'single';
+            if (dom.rfSingleRow) dom.rfSingleRow.style.display = mode === 'single' ? '' : 'none';
+            if (dom.rfRangeRow) dom.rfRangeRow.style.display = mode === 'range' ? '' : 'none';
+            updateReflectionHint();
+        };
+
+        const switchReflectionTab = (tab) => {
+            if (dom.rfTabs) dom.rfTabs.forEach(b => b.classList.toggle('active', b.dataset.rfTab === tab));
+            if (dom.rfPaneNew) dom.rfPaneNew.style.display = tab === 'new' ? '' : 'none';
+            if (dom.rfPaneSaved) dom.rfPaneSaved.style.display = tab === 'saved' ? '' : 'none';
+            if (dom.rfGenerateBtn) dom.rfGenerateBtn.style.display = tab === 'new' ? '' : 'none';
+            if (tab === 'saved') { reflectionPage = 1; renderReflectionList(); }
+        };
+
+        const showReflectionModal = () => {
+            const book = getActiveBook();
+            if (!book) { addSystemMessage('请先打开一本书'); return; }
+            dom.reflectionTitle.textContent = `《${book.title}》· 读后感`;
+            renderReflectionAuthorOptions();
+            renderReflectionChapterOptions();
+            dom.rfWords.value = getReflectionWords();
+            dom.rfPrompt.value = getReflectionPrompt();
+            dom.rfResult.style.display = 'none';
+            dom.rfResultText.textContent = '';
+            dom.rfResultMeta.textContent = '';
+            currentReflection = null;
+            reflectionPage = 1;
+            applyReflectionModeUI();
+            switchReflectionTab('new');
+            dom.reflectionModal.classList.add('show');
+        };
+        const hideReflectionModal = () => dom.reflectionModal.classList.remove('show');
+
+        const generateReflection = async () => {
+            const book = getActiveBook();
+            if (!book) { addSystemMessage('请先打开一本书'); return; }
+            const toc = book.toc || [];
+            const scope = getReflectionScope(book);
+            const words = Math.min(6000, Math.max(50, parseInt(dom.rfWords.value, 10) || 500));
+            const rawPrompt = (dom.rfPrompt.value || '').trim();
+            const userPrompt = rawPrompt || DEFAULT_REFLECTION_PROMPT;
+
+            // 记住这次的字数与提示词，下次打开直接沿用
+            if (!state.settings.reading) state.settings.reading = {};
+            state.settings.reading.reflectionWords = words;
+            state.settings.reading.reflectionPrompt = rawPrompt;
+            localforage.setItem('readingCompanionSettings', state.settings);
+
+            const material = buildReflectionMaterial(book, scope.startIdx, scope.endIdx);
+            if (!material.text || !material.text.trim()) { addSystemMessage('这个范围里没有取到正文内容'); return; }
+
+            const startPara = toc.length ? (toc[scope.startIdx].paraIndex || 0) : 0;
+            const endPara = toc.length
+                ? (toc[scope.endIdx + 1] ? toc[scope.endIdx + 1].paraIndex : (book.paragraphs || []).length)
+                : (book.paragraphs || []).length;
+            const notes = (dom.rfUseNotes && dom.rfUseNotes.checked) ? collectReflectionNotes(startPara, endPara) : '';
+
+            // 由界面上选定的角色执笔：读取 TA 的人设、世界书与长期记忆
+            const author = getReflectionAuthor();
+            const isOtherAuthor = !!(author && author.id !== state.characters.activeId);
+            const charName = (author && author.name) || state.settings.aiName || '伴侣';
+            const activeCharName = state.settings.aiName || '伴侣';
+            // 选的就是当前角色时不做覆盖，直接沿用实时设置（避免用到尚未保存的旧角色卡）
+            const charOverride = isOtherAuthor ? {
+                name: charName,
+                prompt: author.prompt || '',
+                worldBook: Array.isArray(author.worldBook) ? author.worldBook : [],
+                memories: await loadMemoriesForCharacter(author.id),
+            } : null;
+
+            const userName = state.settings.userName || '我';
+            const scopeDesc = scope.label === '整本书' ? '整本书' : `「${scope.label}」`;
+
+            const lengthOverride = `这次要写的是一篇 ${words} 字左右的长文（读后感），可以放开写、写成好几段，但语气依旧口语、随性、跳跃，不要写成工整的作文。`;
+            const sceneExtra = `${userName} 让你写一篇关于《${book.title}》${scopeDesc}的读后感／感想。`;
+            const taskRules = [
+                `这一次不是发聊天消息，而是你（${charName}）自己坐下来，把读完这些内容之后心里翻腾的东西写成一段长一点的文字，给 ${userName} 看。`,
+                `- 目标长度：${words} 字左右（上下浮动一两成没关系；别只写两三句就交差，也别为了凑字数注水、反复说同一件事）。`,
+                `- 可以分成几段，段落之间直接换行；不要标题、不要小标题、不要编号、不要分点罗列，也不要"总之/综上/总的来说"这种作文腔的收尾。`,
+                `- 依旧是"${charName}"在说话：口语、随性、有情绪、有偏见，想到哪写到哪，允许跑题、允许自我打断、允许突然拐到别的事上去。`,
+                `- 不要复述剧情、不要写内容简介，也不要写成书评或分析报告；写的是"我读完之后想说的话"。`,
+                `- 不要写"读后感："之类的前缀或标题，直接开始写正文。`,
+                `- 只写你自己的想法，不要替 ${userName} 说话、不要替 TA 定义感受，也别在文里问一堆问题让 TA 回答。`,
+                `- 不要提到"提示词""任务""字数要求"这些东西本身。`,
+            ].join('\n');
+            const system = buildRoleplaySystemContent({ scanText: material.text.slice(0, 4000), sceneExtra, lengthOverride, charOverride })
+                + `\n\n【本次特殊任务·优先级高于上面关于"消息长短"与"聊天格式"的规则】\n${taskRules}`;
+
+            const materialNote = material.mode === 'summary'
+                ? '（篇幅太长，所以主要给的是各章梗概，末尾附了原文片段）'
+                : (material.mode === 'sample' ? '（这本书没有目录，下面是全书抽取的若干片段）' : '');
+            const userParts = [];
+            userParts.push(`下面是《${book.title}》${scope.label === '整本书' ? '' : '中' + scopeDesc}的内容${materialNote}：\n\n${material.text}`);
+            if (notes) {
+                // 书里的 AI 点评是「当前陪读角色」留下的；换人执笔时要说清楚，免得作者误当成自己写的
+                userParts.push(isOtherAuthor
+                    ? `这是 ${userName} 和「${activeCharName}」读这一段时留下的想法与点评（供你参考，你可以赞同、也可以完全不同意，但别把它们当成你自己说过的话）：\n${notes}`
+                    : `这是我们读这一段时留下的想法与点评（可以顺着聊，也可以有不一样的看法）：\n${notes}`);
+            }
+            userParts.push(`${userName} 这次想看的方向（尽量照顾到，但不必逐条对应，也不用全写）：\n${userPrompt}`);
+            userParts.push(`现在开始写吧，${words} 字左右，直接写正文。`);
+
+            const btn = dom.rfGenerateBtn;
+            const origText = btn.textContent;
+            btn.disabled = true; btn.textContent = 'TA 在写…';
+            dom.rfResult.style.display = '';
+            dom.rfResultMeta.textContent = `${charName} · ${scope.label} · 目标 ${words} 字`;
+            dom.rfResultText.textContent = `${charName} 正在写，长一点的文字可能要等十几秒到一分钟……`;
+            try { dom.rfResult.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+            try {
+                const { content, error } = await callAIApi([
+                    { role: 'system', content: system },
+                    { role: 'user', content: userParts.join('\n\n') },
+                ], 'chat');
+                if (error) { dom.rfResultText.textContent = '写失败了：' + error; return; }
+                const text = (content || '').trim();
+                if (!text) { dom.rfResultText.textContent = '没有拿到内容，再试一次吧。'; return; }
+                const entry = {
+                    id: `rf-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                    createdAt: Date.now(),
+                    bookTitle: book.title,
+                    authorId: author ? author.id : null,
+                    authorName: charName,
+                    scopeLabel: scope.label,
+                    words,
+                    prompt: userPrompt,
+                    text,
+                };
+                currentReflection = entry;
+                dom.rfResultText.textContent = text;
+                dom.rfResultMeta.textContent = `${charName} · ${scope.label} · 约 ${text.replace(/\s/g, '').length} 字 · 已存进「已保存」`;
+                if (!state.reflections[book.title]) state.reflections[book.title] = [];
+                state.reflections[book.title].unshift(entry);
+                await saveReflections();
+            } finally {
+                btn.disabled = false; btn.textContent = origText;
+            }
+        };
+
+        // 这篇是谁写的（旧数据没记作者时标为未标注）
+        const reflectionAuthorName = (entry) => (entry && entry.authorName) || '未标注作者';
+
+        const reflectionToText = (entry) => {
+            return `《${entry.bookTitle}》· 读后感\r\n范围：${entry.scopeLabel}\r\n作者：${reflectionAuthorName(entry)}\r\n时间：${new Date(entry.createdAt).toLocaleString()}\r\n\r\n`
+                + String(entry.text || '').replace(/\n/g, '\r\n') + '\r\n';
+        };
+
+        const buildReflectionDocx = (entry) => {
+            const charName = reflectionAuthorName(entry);
+            const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const wp = (text, opts = {}) => {
+                const rPr = [];
+                if (opts.bold) rPr.push('<w:b/>');
+                if (opts.italic) rPr.push('<w:i/>');
+                if (opts.size) rPr.push(`<w:sz w:val="${opts.size}"/>`);
+                if (opts.color) rPr.push(`<w:color w:val="${opts.color}"/>`);
+                const rPrXml = rPr.length ? `<w:rPr>${rPr.join('')}</w:rPr>` : '';
+                const lines = esc(text).split('\n');
+                let runInner = '';
+                lines.forEach((ln, idx) => { if (idx > 0) runInner += '<w:br/>'; runInner += `<w:t xml:space="preserve">${ln}</w:t>`; });
+                return `<w:p><w:r>${rPrXml}${runInner}</w:r></w:p>`;
+            };
+            let body = '';
+            body += wp(`《${entry.bookTitle}》· 读后感`, { bold: true, size: 36 });
+            body += wp(`${entry.scopeLabel}　${charName}　${new Date(entry.createdAt).toLocaleString()}`, { italic: true, size: 18, color: '888888' });
+            String(entry.text || '').split(/\n+/).forEach(p => { if (p.trim()) body += wp(p.trim()); });
+            const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`;
+            const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
+            const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+            return buildZip([
+                { name: '[Content_Types].xml', data: contentTypes },
+                { name: '_rels/.rels', data: rels },
+                { name: 'word/document.xml', data: documentXml },
+            ]);
+        };
+
+        const exportReflection = (entry, format) => {
+            if (!entry || !entry.text) { addSystemMessage('还没有可以导出的读后感'); return; }
+            const safeTitle = String(entry.bookTitle || '读后感').replace(/[\\/:*?"<>|]/g, '_');
+            const safeScope = String(entry.scopeLabel || '').replace(/[\\/:*?"<>|]/g, '_').slice(0, 20);
+            const safeAuthor = String(reflectionAuthorName(entry)).replace(/[\\/:*?"<>|]/g, '_').slice(0, 16);
+            const base = `${safeTitle}_读后感_${safeAuthor}${safeScope ? '_' + safeScope : ''}`;
+            if (format === 'txt') {
+                downloadBlob(new Blob(['\ufeff' + reflectionToText(entry)], { type: 'text/plain;charset=utf-8' }), base + '.txt');
+            } else {
+                downloadBlob(buildReflectionDocx(entry), base + '.docx');
+            }
+        };
+
+        const copyReflection = async (entry) => {
+            if (!entry || !entry.text) return;
+            try {
+                await navigator.clipboard.writeText(entry.text);
+                addSystemMessage('读后感已复制', true);
+            } catch (e) {
+                // 某些浏览器（尤其 file:// 或 http）不给剪贴板权限，退化成手动选择
+                const ta = document.createElement('textarea');
+                ta.value = entry.text;
+                ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); addSystemMessage('读后感已复制', true); }
+                catch (e2) { addSystemMessage('这个浏览器不允许自动复制，请手动长按选择文字'); }
+                ta.remove();
+            }
+        };
+
+        // 把读后感作为伴侣的一条消息发到聊天里（也会进入 TA 的对话记忆）
+        // 若这篇不是当前聊天角色写的，先问一下要不要切过去，否则会记到别人账上
+        const sendReflectionToChat = async (entry) => {
+            if (!entry || !entry.text) return;
+            const authorId = entry.authorId;
+            if (authorId && authorId !== state.characters.activeId) {
+                const target = (state.characters.list || []).find(c => c.id === authorId);
+                const activeName = state.settings.aiName || '当前角色';
+                if (target) {
+                    if (confirm(`这篇是「${target.name}」写的，现在聊天对象是「${activeName}」。\n\n确定要切换到「${target.name}」再发过去吗？\n（取消则不发送）`)) {
+                        await switchCharacter(authorId);
+                    } else {
+                        return;
+                    }
+                } else if (!confirm(`这篇的作者「${reflectionAuthorName(entry)}」已经不在角色列表里了。\n\n仍然以「${activeName}」的身份发到聊天里吗？`)) {
+                    return;
+                }
+            }
+            const html = rfEscHtml(entry.text).replace(/\n/g, '<br>');
+            addMessage('ai', html, { addToHistory: true });
+            hideReflectionModal();
+            switchView('chat-view');
+        };
+
+        const deleteReflection = async (bookTitle, id) => {
+            const list = state.reflections[bookTitle] || [];
+            state.reflections[bookTitle] = list.filter(e => e.id !== id);
+            if (!state.reflections[bookTitle].length) delete state.reflections[bookTitle];
+            await saveReflections();
+            renderReflectionList();
+        };
+
+        // ===== 已保存列表：按作者 / 书籍筛选 + 翻页 =====
+        const REFLECTIONS_PER_PAGE = 5;
+        let reflectionPage = 1;
+
+        // 汇总当前筛选条件下的条目（带上所属书名，按时间倒序）
+        const getFilteredReflections = () => {
+            const book = getActiveBook();
+            const bookScope = (dom.rfFilterBook && dom.rfFilterBook.value) || 'current';
+            const authorScope = (dom.rfFilterAuthor && dom.rfFilterAuthor.value) || 'mine';
+            const authorId = dom.rfAuthor ? dom.rfAuthor.value : state.characters.activeId;
+
+            let entries = [];
+            if (bookScope === 'current') {
+                if (!book) return [];
+                entries = (state.reflections[book.title] || []).map(e => ({ ...e, bookTitle: e.bookTitle || book.title }));
+            } else {
+                Object.keys(state.reflections).forEach(title => {
+                    (state.reflections[title] || []).forEach(e => entries.push({ ...e, bookTitle: e.bookTitle || title }));
+                });
+            }
+            if (authorScope === 'mine') entries = entries.filter(e => e.authorId === authorId);
+            entries.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            return entries;
+        };
+
+        // 就地编辑一篇已保存的读后感（写得不满意时不必删掉重来）
+        const startEditReflection = (entry, itemEl, bodyEl) => {
+            if (itemEl.querySelector('.rf-edit-area')) return;   // 已在编辑中
+            const ta = document.createElement('textarea');
+            ta.className = 'rf-edit-area';
+            ta.value = entry.text || '';
+            bodyEl.style.display = 'none';
+            bodyEl.parentNode.insertBefore(ta, bodyEl.nextSibling);
+
+            const bar = document.createElement('div');
+            bar.className = 'rf-item-actions';
+            const mkBtn = (label, fn, danger) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'rf-mini-btn' + (danger ? ' danger' : '');
+                b.textContent = label;
+                b.addEventListener('click', fn);
+                return b;
+            };
+            const cleanup = () => { ta.remove(); bar.remove(); bodyEl.style.display = ''; };
+            bar.appendChild(mkBtn('保存', async () => {
+                const text = ta.value.trim();
+                if (!text) { addSystemMessage('内容不能为空'); return; }
+                const list = state.reflections[entry.bookTitle] || [];
+                const target = list.find(e => e.id === entry.id);
+                if (target) { target.text = text; target.editedAt = Date.now(); }
+                await saveReflections();
+                if (currentReflection && currentReflection.id === entry.id) {
+                    currentReflection.text = text;
+                    if (dom.rfResultText) dom.rfResultText.textContent = text;
+                }
+                cleanup();
+                renderReflectionList();
+                addSystemMessage('读后感已更新', true);
+            }));
+            bar.appendChild(mkBtn('取消', cleanup, true));
+            ta.parentNode.insertBefore(bar, ta.nextSibling);
+            ta.focus();
+        };
+
+        // 用这篇当初的设置（作者 / 范围 / 字数 / 提示词）重写一篇
+        const rewriteReflection = (entry) => {
+            const book = getActiveBook();
+            if (!book) { addSystemMessage('请先打开一本书'); return; }
+            if (entry.bookTitle && book.title !== entry.bookTitle) {
+                addSystemMessage(`这篇属于《${entry.bookTitle}》，请先切换到那本书再重写`);
+                return;
+            }
+            // 把当初的参数填回「写一篇」表单，用户可微调后再生成
+            if (dom.rfAuthor && entry.authorId) {
+                const exists = (state.characters.list || []).some(c => c.id === entry.authorId);
+                if (exists) dom.rfAuthor.value = entry.authorId;
+            }
+            if (dom.rfWords && entry.words) dom.rfWords.value = entry.words;
+            if (dom.rfPrompt && entry.prompt) dom.rfPrompt.value = entry.prompt;
+
+            // 还原范围选择：按保存的 scopeLabel 在目录里反查
+            const toc = book.toc || [];
+            const label = entry.scopeLabel || '';
+            if (label === '整本书' || !toc.length) {
+                if (dom.rfMode) dom.rfMode.value = 'whole';
+            } else if (label.includes(' ~ ')) {
+                const [a, b] = label.split(' ~ ');
+                const si = toc.findIndex(t => t.title === a.trim());
+                const ei = toc.findIndex(t => t.title === b.trim());
+                if (si >= 0 && ei >= 0) {
+                    dom.rfMode.value = 'range';
+                    dom.rfStart.value = String(si);
+                    dom.rfEnd.value = String(ei);
+                } else if (dom.rfMode) dom.rfMode.value = 'whole';
+            } else {
+                const i = toc.findIndex(t => t.title === label);
+                if (i >= 0) { dom.rfMode.value = 'single'; dom.rfChapter.value = String(i); }
+                else if (dom.rfMode) dom.rfMode.value = 'whole';
+            }
+            applyReflectionModeUI();
+            switchReflectionTab('new');
+            addSystemMessage('已载入这篇的设置，确认后点「让 TA 写」即可重写', true);
+        };
+
+        const renderReflectionList = () => {
+            if (!dom.rfList) return;
+            const entries = getFilteredReflections();
+            const bookScope = (dom.rfFilterBook && dom.rfFilterBook.value) || 'current';
+            const totalPages = Math.max(1, Math.ceil(entries.length / REFLECTIONS_PER_PAGE));
+            if (reflectionPage > totalPages) reflectionPage = totalPages;
+            if (reflectionPage < 1) reflectionPage = 1;
+
+            if (dom.rfSavedCount) {
+                const authorScope = (dom.rfFilterAuthor && dom.rfFilterAuthor.value) || 'mine';
+                const who = authorScope === 'mine'
+                    ? `「${(getReflectionAuthor() || {}).name || '当前角色'}」`
+                    : '全部作者';
+                dom.rfSavedCount.textContent = `${who} 共 ${entries.length} 篇`;
+            }
+
+            dom.rfList.innerHTML = '';
+            if (!entries.length) {
+                dom.rfList.innerHTML = '<div class="rf-empty">这里还没有读后感。<br>去「写一篇」里挑个范围，让 TA 写一篇吧～</div>';
+                if (dom.rfPager) dom.rfPager.style.display = 'none';
+                return;
+            }
+
+            const from = (reflectionPage - 1) * REFLECTIONS_PER_PAGE;
+            entries.slice(from, from + REFLECTIONS_PER_PAGE).forEach(entry => {
+                const item = document.createElement('div');
+                item.className = 'rf-item';
+
+                const head = document.createElement('div');
+                head.className = 'rf-item-head';
+                const author = document.createElement('span');
+                author.className = 'rf-item-author';
+                author.textContent = reflectionAuthorName(entry);
+                const title = document.createElement('span');
+                title.className = 'rf-item-title';
+                title.textContent = entry.scopeLabel || '整本书';
+                const time = document.createElement('span');
+                time.className = 'rf-item-time';
+                time.textContent = new Date(entry.createdAt).toLocaleString();
+                head.appendChild(author);
+                head.appendChild(title);
+                head.appendChild(time);
+                item.appendChild(head);
+
+                // 跨书查看时标出这篇属于哪本书
+                if (bookScope === 'all') {
+                    const bk = document.createElement('div');
+                    bk.className = 'rf-item-book';
+                    bk.textContent = `《${entry.bookTitle || '未知书籍'}》`;
+                    item.appendChild(bk);
+                }
+
+                const body = document.createElement('div');
+                body.className = 'rf-item-text collapsed';
+                body.textContent = entry.text || '';
+                item.appendChild(body);
+
+                const actions = document.createElement('div');
+                actions.className = 'rf-item-actions';
+                const mk = (label, handler, danger) => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'rf-mini-btn' + (danger ? ' danger' : '');
+                    b.textContent = label;
+                    b.addEventListener('click', handler);
+                    return b;
+                };
+                const toggleBtn = mk('展开', () => {
+                    const collapsed = body.classList.toggle('collapsed');
+                    toggleBtn.textContent = collapsed ? '展开' : '收起';
+                });
+                actions.appendChild(toggleBtn);
+                actions.appendChild(mk('编辑', () => startEditReflection(entry, item, body)));
+                actions.appendChild(mk('重写', () => rewriteReflection(entry)));
+                actions.appendChild(mk('复制', () => copyReflection(entry)));
+                actions.appendChild(mk('TXT', () => exportReflection(entry, 'txt')));
+                actions.appendChild(mk('DOCX', () => exportReflection(entry, 'docx')));
+                actions.appendChild(mk('发到聊天', () => sendReflectionToChat(entry)));
+                actions.appendChild(mk('删除', () => { if (confirm('确定删除这篇读后感吗？')) deleteReflection(entry.bookTitle, entry.id); }, true));
+                item.appendChild(actions);
+
+                dom.rfList.appendChild(item);
+            });
+
+            if (dom.rfPager) {
+                dom.rfPager.style.display = totalPages > 1 ? '' : 'none';
+                if (dom.rfPageInfo) dom.rfPageInfo.textContent = `第 ${reflectionPage} / ${totalPages} 页`;
+                if (dom.rfPrevPage) dom.rfPrevPage.disabled = reflectionPage <= 1;
+                if (dom.rfNextPage) dom.rfNextPage.disabled = reflectionPage >= totalPages;
+            }
+        };
+
+        const gotoReflectionPage = (delta) => {
+            reflectionPage += delta;
+            renderReflectionList();
+            if (dom.rfPaneSaved) dom.rfPaneSaved.scrollTop = 0;
+        };
+
         const triggerAIReadComment = () => { /* same code */
             const activeBook = getActiveBook();
             if (!activeBook) return;
@@ -4394,7 +5477,18 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             });
             if (visibleParagraphs.length > 0) {
                 state.reading.lastCommentTime = Date.now();
-                const targetPara = visibleParagraphs[Math.floor(Math.random() * visibleParagraphs.length)];
+                // 同样优先避开紧挨着已评论段落的那一段，免得一路顺着往下评
+                const notAdjacent = visibleParagraphs.filter(p => {
+                    const id = parseInt(p.dataset.paraId, 10);
+                    if (Number.isNaN(id)) return true;
+                    const commented = (x) => {
+                        const arr = activeBook.comments[x];
+                        return Array.isArray(arr) && arr.some(c => c.type === 'ai');
+                    };
+                    return !commented(id - 1) && !commented(id + 1);
+                });
+                const candidates = notAdjacent.length ? notAdjacent : visibleParagraphs;
+                const targetPara = candidates[Math.floor(Math.random() * candidates.length)];
                 const text = targetPara.textContent.trim();
                 const sentences = text.match(/[^.!?。！？]+[.!?。！？]?/g) || [text];
                 if (sentences.length === 0) return;
@@ -4420,6 +5514,97 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 }
             }
         };
+        // ===== 阅读概览：把已有数据（进度 / 批注 / 摘要 / 读后感）汇总成一页 =====
+        const showStatsModal = () => {
+            const book = getActiveBook();
+            if (!book) { addSystemMessage('请先打开一本书'); return; }
+            dom.statsTitle.textContent = `《${book.title}》· 阅读概览`;
+
+            const total = (book.paragraphs || []).length;
+            const cur = Math.min(state.reading.curPara || 0, Math.max(0, total - 1));
+            const pct = total > 1 ? Math.round((cur / (total - 1)) * 100) : 100;
+            const toc = book.toc || [];
+            const chapIdx = toc.length ? Math.max(0, findChapterIndexByPara(toc, cur)) : -1;
+
+            // 全书字数（段落文本长度之和，去掉空白）
+            let chars = 0;
+            (book.paragraphs || []).forEach(p => { chars += (p || '').replace(/\s/g, '').length; });
+
+            // 批注统计（当前角色在这本书下的）
+            let aiCount = 0, userCount = 0;
+            Object.keys(book.comments || {}).forEach(pid => {
+                const arr = book.comments[pid];
+                if (!Array.isArray(arr)) return;
+                arr.forEach(c => { if (!c) return; if (c.type === 'user') userCount++; else aiCount++; });
+            });
+
+            // 章节摘要完成度
+            const sums = state.summaries[book.title] || {};
+            let sumDone = 0;
+            toc.forEach(t => { if ((sums[t.title] || '').trim()) sumDone++; });
+
+            // 读后感（本书，按作者分组）
+            const rfList = (state.reflections[book.title] || []);
+            const byAuthor = {};
+            rfList.forEach(e => {
+                const k = (e && e.authorName) || '未标注作者';
+                byAuthor[k] = (byAuthor[k] || 0) + 1;
+            });
+
+            const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const fmt = (n) => n >= 10000 ? (n / 10000).toFixed(1) + ' 万' : String(n);
+
+            let html = '';
+            html += `<div class="st-sec">
+                <div class="st-sec-title">阅读进度</div>
+                <div class="st-bar"><div class="st-bar-fill" style="width:${pct}%"></div></div>
+                <div class="st-line"><span class="st-k">已读</span><span class="st-v">${pct}%</span></div>
+                <div class="st-line"><span class="st-k">当前位置</span><span class="st-v">第 ${cur + 1} / ${total} 段</span></div>
+                ${chapIdx >= 0 ? `<div class="st-line"><span class="st-k">当前章节</span><span class="st-v">${esc(toc[chapIdx].title)}</span></div>
+                <div class="st-line"><span class="st-k">章节进度</span><span class="st-v">第 ${chapIdx + 1} / ${toc.length} 章</span></div>` : ''}
+                <div class="st-line"><span class="st-k">全书字数</span><span class="st-v">约 ${fmt(chars)} 字</span></div>
+            </div>`;
+
+            html += `<div class="st-sec">
+                <div class="st-sec-title">我们留下的痕迹</div>
+                <div class="st-grid">
+                    <div class="st-cell"><div class="st-num">${userCount}</div><div class="st-label">我的想法</div></div>
+                    <div class="st-cell"><div class="st-num">${aiCount}</div><div class="st-label">${esc(state.settings.aiName || '伴侣')}的点评</div></div>
+                    <div class="st-cell"><div class="st-num">${rfList.length}</div><div class="st-label">读后感</div></div>
+                    <div class="st-cell"><div class="st-num">${sumDone}/${toc.length || 0}</div><div class="st-label">章节摘要</div></div>
+                </div>
+            </div>`;
+
+            if (rfList.length) {
+                let lines = '';
+                Object.keys(byAuthor).sort((a, b) => byAuthor[b] - byAuthor[a]).forEach(k => {
+                    lines += `<div class="st-line"><span class="st-k">${esc(k)}</span><span class="st-v">${byAuthor[k]} 篇</span></div>`;
+                });
+                const latest = rfList.reduce((m, e) => (!m || (e.createdAt || 0) > (m.createdAt || 0)) ? e : m, null);
+                html += `<div class="st-sec">
+                    <div class="st-sec-title">读后感作者</div>
+                    ${lines}
+                    ${latest ? `<div class="st-line"><span class="st-k">最近一篇</span><span class="st-v">${new Date(latest.createdAt).toLocaleDateString()}</span></div>` : ''}
+                </div>`;
+            }
+
+            // 书架总览
+            const bookCount = Object.keys(state.books || {}).length;
+            let totalRf = 0;
+            Object.keys(state.reflections || {}).forEach(t => { totalRf += (state.reflections[t] || []).length; });
+            html += `<div class="st-sec">
+                <div class="st-sec-title">书架总览</div>
+                <div class="st-line"><span class="st-k">书籍</span><span class="st-v">${bookCount} 本</span></div>
+                <div class="st-line"><span class="st-k">AI 角色</span><span class="st-v">${(state.characters.list || []).length} 个</span></div>
+                <div class="st-line"><span class="st-k">读后感总数</span><span class="st-v">${totalRf} 篇</span></div>
+                <div class="st-line"><span class="st-k">长期记忆</span><span class="st-v">${(state.memories || []).length} 条</span></div>
+            </div>`;
+
+            dom.statsBody.innerHTML = html;
+            dom.statsModal.classList.add('show');
+        };
+        const hideStatsModal = () => dom.statsModal.classList.remove('show');
+
         const triggerAIPat = () => { /* same code */
             state.reading.lastPatTime = Date.now();
             let patter, patted, suffixes;
@@ -4470,21 +5655,37 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             const oldPopup = document.querySelector('.comment-popup'); if (oldPopup) oldPopup.remove();
             const popup = document.createElement('div');
             popup.className = `comment-popup`;
+            // 记住这个弹窗是哪个段落的角标打开的，供角标再次点击时判断「关闭还是切换」
+            popup.dataset.ownerParaId = paraId;
             let contentHTML = '';
             comments.forEach((comment, index) => {
-                const avatarSrc = comment.type === 'user' ? state.settings.userAvatar : state.settings.aiAvatar;
                 const name = comment.type === 'user' ? state.settings.userName : state.settings.aiName;
-                contentHTML += `<div class="comment-body" data-comment-index="${index}" data-para-id="${paraId}"><div class="comment-header"><img src="${avatarSrc}" class="avatar"><span class="name">${name}</span></div>${comment.text}</div>`;
+                const avatar = comment.type === 'user' ? state.settings.userAvatar : state.settings.aiAvatar;
+                // 批注正文按纯文本转义后再插入：AI 或用户写的内容里可能含 < > &，
+                // 直接拼进 innerHTML 会吞掉字符甚至破坏弹窗结构。
+                const safe = String(comment.text == null ? '' : comment.text)
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                contentHTML += `<div class="comment-body" data-comment-index="${index}" data-para-id="${paraId}">`
+                    + `<div class="comment-header"><img src="${avatar}" class="avatar"><span class="name">${name}</span>`
+                    + `<button type="button" class="cmt-edit-btn" title="编辑">改</button></div>`
+                    + `<div class="cmt-text">${safe}</div></div>`;
             });
             popup.innerHTML = contentHTML;
             dom.readerContentWrapper.appendChild(popup);
             popup.querySelectorAll('.comment-body').forEach(body => {
-                body.addEventListener('mousedown', (e) => { if (e.button === 2) return; state.longPressTimer = setTimeout(() => handleDeleteComment(body), 800); });
+                const startLongPress = () => { state.longPressTimer = setTimeout(() => handleDeleteComment(body), 800); };
+                body.addEventListener('mousedown', (e) => { if (e.button === 2) return; if (e.target.closest('.cmt-edit-btn')) return; startLongPress(); });
                 body.addEventListener('mouseup', () => clearTimeout(state.longPressTimer));
                 body.addEventListener('mouseleave', () => clearTimeout(state.longPressTimer));
-                body.addEventListener('touchstart', () => { state.longPressTimer = setTimeout(() => handleDeleteComment(body), 800); });
+                body.addEventListener('touchstart', (e) => { if (e.target.closest('.cmt-edit-btn')) return; startLongPress(); });
                 body.addEventListener('touchend', () => clearTimeout(state.longPressTimer));
                 body.addEventListener('contextmenu', (e) => { e.preventDefault(); handleDeleteComment(body); });
+                const editBtn = body.querySelector('.cmt-edit-btn');
+                if (editBtn) editBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    clearTimeout(state.longPressTimer);
+                    startEditComment(body);
+                });
             });
             popup.style.visibility = 'hidden'; popup.classList.add('show');
             const { top, left } = calculatePopupPosition(targetIcon, popup);
@@ -4511,6 +5712,52 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 hideCommentPopup();
             }
         };
+        // 在气泡里就地编辑一条批注（原先只能长按删除，和「书籍笔记」面板行为不一致）
+        const startEditComment = (commentBody) => {
+            const activeBook = getActiveBook();
+            if (!activeBook) return;
+            if (commentBody.querySelector('.cmt-edit-area')) return;
+            const paraId = commentBody.dataset.paraId;
+            const idx = parseInt(commentBody.dataset.commentIndex, 10);
+            const arr = activeBook.comments[paraId];
+            if (!arr || !arr[idx]) return;
+            const textEl = commentBody.querySelector('.cmt-text');
+            if (!textEl) return;
+
+            const ta = document.createElement('textarea');
+            ta.className = 'cmt-edit-area';
+            ta.value = arr[idx].text || '';
+            textEl.style.display = 'none';
+            textEl.parentNode.insertBefore(ta, textEl.nextSibling);
+
+            const bar = document.createElement('div');
+            bar.className = 'cmt-edit-bar';
+            const mkBtn = (label, fn) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'rf-mini-btn';
+                b.textContent = label;
+                b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+                return b;
+            };
+            const cleanup = () => { ta.remove(); bar.remove(); textEl.style.display = ''; };
+            bar.appendChild(mkBtn('保存', async () => {
+                const v = ta.value.trim();
+                if (!v) { addSystemMessage('批注不能为空'); return; }
+                arr[idx].text = v;
+                await saveComments();
+                textEl.textContent = v;
+                cleanup();
+                addSystemMessage('批注已更新', true);
+            }));
+            bar.appendChild(mkBtn('取消', cleanup));
+            ta.parentNode.insertBefore(bar, ta.nextSibling);
+            // 编辑区里的按下不该触发长按删除
+            ta.addEventListener('mousedown', (e) => { e.stopPropagation(); clearTimeout(state.longPressTimer); });
+            ta.addEventListener('touchstart', (e) => { e.stopPropagation(); clearTimeout(state.longPressTimer); });
+            ta.focus();
+        };
+
         const removeHighlight = (highlightId) => { /* same code */
             const highlights = document.querySelectorAll(`[data-highlight-id="${highlightId}"]`);
             highlights.forEach(span => {
@@ -4521,6 +5768,23 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             });
         };
         const hideCommentPopup = () => { const popup = document.querySelector('.comment-popup'); if (popup) { popup.classList.remove('show'); setTimeout(() => popup.remove(), 200); } };
+
+        // 角标即开关：已展开同一条就收起；展开的是别的段落则直接切过去。
+        // 这样不必再点正文空白处去关闭，也就不会顺带唤出划词菜单 / 触发翻页。
+        const toggleCommentPopup = (targetIcon) => {
+            const pElement = targetIcon.closest('p');
+            if (!pElement) return;
+            // 这次点击不再冒泡到全局监听，划词菜单得自己收起来，免得残留在屏幕上
+            hideSelectionMenu();
+            const paraId = pElement.dataset.paraId;
+            const popup = document.querySelector('.comment-popup');
+            // 正在关闭动画中的弹窗（已移除 show）不算展开，此时应重新打开
+            if (popup && popup.classList.contains('show') && popup.dataset.ownerParaId === String(paraId)) {
+                hideCommentPopup();
+                return;
+            }
+            showCommentPopup(targetIcon);
+        };
         const calculatePopupPosition = (targetElement, popupElement) => { /* same code */
             const wrapperRect = dom.readerContentWrapper.getBoundingClientRect();
             const targetRect = targetElement.getBoundingClientRect();
@@ -4726,53 +5990,73 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         const hideSearchModal = () => {
             dom.searchModal.classList.remove('show');
         };
+        // 把用户输入当成「纯文本」而不是正则：小说里（）【】…… 这类字符很常见，
+        // 不转义会让 new RegExp 直接抛异常（搜索失败），或把 a.b 误匹配成 axb。
+        const escapeRegExp = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const SEARCH_RESULT_LIMIT = 200;   // 搜「的」这类高频字可命中上万段，必须截断否则界面卡死
+
         const performSearch = () => {
             const query = dom.searchInput.value.trim();
             if(!query) return;
             const activeBook = getActiveBook();
             if(!activeBook) return;
-            
+
             dom.searchResultsList.innerHTML = '<div style="text-align:center;padding:10px;">搜索中...</div>';
-            
+
             const results = [];
-            // Simple iteration search
+            let totalHits = 0;
+            // 命中数照常统计，但只保留前 N 条用于渲染
             activeBook.paragraphs.forEach((text, index) => {
-                if(text.includes(query)) {
-                    results.push({ index, text });
+                if (text.includes(query)) {
+                    totalHits++;
+                    if (results.length < SEARCH_RESULT_LIMIT) results.push({ index, text });
                 }
             });
 
             dom.searchResultsList.innerHTML = '';
-            if(results.length === 0) {
+            if (results.length === 0) {
                 dom.searchResultsList.innerHTML = '<div style="text-align:center;padding:10px;">未找到相关内容</div>';
-            } else {
-                results.forEach(res => {
-                    const item = document.createElement('div');
-                    item.className = 'search-result-item';
-                    
-                    // Highlight logic for preview
-                    const safeText = res.text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    const highlightedText = safeText.replace(new RegExp(query, 'g'), `<span class="highlight-text">${query}</span>`);
-                    
-                    // Find Chapter
-                    let chapter = '未知章节';
-                    for(let i=activeBook.toc.length-1; i>=0; i--) {
-                        if(res.index >= activeBook.toc[i].paraIndex) {
-                            chapter = activeBook.toc[i].title;
-                            break;
-                        }
-                    }
+                return;
+            }
 
-                    item.innerHTML = `
+            // 结果统计 / 截断提示
+            const info = document.createElement('div');
+            info.style.cssText = 'font-size:12px;color:var(--secondary-text-color);padding:6px 4px;';
+            info.textContent = totalHits > results.length
+                ? `共命中 ${totalHits} 处，只显示前 ${results.length} 条，换更具体的词可缩小范围`
+                : `共命中 ${totalHits} 处`;
+            dom.searchResultsList.appendChild(info);
+
+            const frag = document.createDocumentFragment();
+            results.forEach(res => {
+                const item = document.createElement('div');
+                item.className = 'search-result-item';
+
+                // 长段落只截取命中位置附近的片段，避免整段塞进列表
+                let snippet = res.text;
+                const hit = snippet.indexOf(query);
+                if (snippet.length > 160) {
+                    const from = Math.max(0, hit - 50);
+                    snippet = (from > 0 ? '…' : '') + snippet.slice(from, from + 160) + (from + 160 < res.text.length ? '…' : '');
+                }
+                const safeText = snippet.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                // 转义后的文本上再高亮：query 同样要转义，且用 $& 回填真实匹配内容
+                const safeQueryRe = new RegExp(escapeRegExp(query.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')), 'g');
+                const highlightedText = safeText.replace(safeQueryRe, '<span class="highlight-text">$&</span>');
+
+                let chapter = '未知章节';
+                for (let i = activeBook.toc.length - 1; i >= 0; i--) {
+                    if (res.index >= activeBook.toc[i].paraIndex) { chapter = activeBook.toc[i].title; break; }
+                }
+
+                item.innerHTML = `
                         <div class="search-result-text">${highlightedText}</div>
                         <div class="search-result-chapter">${chapter}</div>
                     `;
-                    item.addEventListener('click', () => {
-                        jumpToParagraph(res.index, query);
-                    });
-                    dom.searchResultsList.appendChild(item);
-                });
-            }
+                item.addEventListener('click', () => { jumpToParagraph(res.index, query); });
+                frag.appendChild(item);
+            });
+            dom.searchResultsList.appendChild(frag);
         };
 
         const jumpToParagraph = (paraIndex, highlightQuery) => {
@@ -4785,6 +6069,31 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 p.classList.add('search-highlight');
                 setTimeout(() => p.classList.remove('search-highlight'), 2000);
             }
+        };
+
+        // ===== 备份提醒：所有数据只在本地，清缓存/换机就会全丢，这里做个温和的状态提示 =====
+        const BACKUP_REMIND_DAYS = 14;
+        const renderBackupHint = async () => {
+            const el = document.getElementById('backup-hint');
+            if (!el) return;
+            let ts = 0;
+            try { ts = (await localforage.getItem('lastBackupAt')) || 0; } catch (e) { ts = 0; }
+            if (!ts) {
+                el.className = 'backup-hint';
+                el.textContent = '还没有导出过备份。书籍、批注、聊天记录、读后感都只存在这台设备上，清理浏览器数据或换手机就会全部丢失，建议现在导出一份。';
+                el.style.display = '';
+                return;
+            }
+            const days = Math.floor((Date.now() - ts) / 86400000);
+            const when = new Date(ts).toLocaleDateString();
+            if (days >= BACKUP_REMIND_DAYS) {
+                el.className = 'backup-hint';
+                el.textContent = `上次备份是 ${days} 天前（${when}），建议再导出一份。`;
+            } else {
+                el.className = 'backup-hint ok';
+                el.textContent = `上次备份：${when}${days > 0 ? `（${days} 天前）` : '（今天）'}`;
+            }
+            el.style.display = '';
         };
 
         // NEW FEATURE: Export/Import Data —— 全量键值转储，覆盖分片存储的所有书籍/角色/批注
@@ -4802,15 +6111,53 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             const dump = {};
             const keys = await localforage.keys();
             for (const k of keys) { dump[k] = await localforage.getItem(k); }
-            const data = { __fullDump__: true, version: "5.0", data: dump };
+            const data = { __fullDump__: true, version: "5.0", exportedAt: Date.now(), data: dump };
 
             const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `reading_companion_backup_${new Date().toISOString().slice(0,10)}.json`;
+            a.download = `♡‧₊ ✧ ₊‧♡ 备份 ${new Date().toISOString().slice(0,10)}.json`;
             a.click();
             URL.revokeObjectURL(url);
+            // 记下备份时间，供设置页的提醒使用
+            await localforage.setItem('lastBackupAt', Date.now());
+            renderBackupHint();
+        };
+
+        // 概括一个备份文件里都有什么，用于导入前确认（避免误用旧备份把数据冲掉）
+        const describeBackup = (data) => {
+            const lines = [];
+            try {
+                if (data && data.__fullDump__ && data.data) {
+                    const d = data.data;
+                    const books = Array.isArray(d.bookIndex) ? d.bookIndex.length
+                        : (d.books && typeof d.books === 'object' ? Object.keys(d.books).length : 0);
+                    const chars = (d.characters && Array.isArray(d.characters.list)) ? d.characters.list.length : 0;
+                    let rf = 0;
+                    const rfObj = d.readingCompanionReflections;
+                    if (rfObj && typeof rfObj === 'object') Object.keys(rfObj).forEach(k => { rf += (rfObj[k] || []).length; });
+                    let chats = 0;
+                    Object.keys(d).forEach(k => { if (k.indexOf('chat_') === 0 && Array.isArray(d[k])) chats += d[k].length; });
+                    lines.push(`备份格式：全量（v${data.version || '?'}）`);
+                    lines.push(`书籍：${books} 本`);
+                    lines.push(`AI 角色：${chars} 个`);
+                    lines.push(`聊天消息：${chats} 条`);
+                    lines.push(`读后感：${rf} 篇`);
+                    if (data.exportedAt) lines.push(`导出时间：${new Date(data.exportedAt).toLocaleString()}`);
+                    else if (d.lastBackupAt) lines.push(`上次备份：${new Date(d.lastBackupAt).toLocaleString()}`);
+                } else if (data) {
+                    const books = data.books && typeof data.books === 'object' ? Object.keys(data.books).length : 0;
+                    lines.push(`备份格式：旧版（v${data.version || '3.0'}）`);
+                    lines.push(`书籍：${books} 本`);
+                    if (data.characters && Array.isArray(data.characters.list)) lines.push(`AI 角色：${data.characters.list.length} 个`);
+                } else {
+                    lines.push('无法识别的备份内容');
+                }
+            } catch (err) {
+                lines.push('（备份内容解析异常，请确认文件是否完整）');
+            }
+            return lines.join('\n');
         };
 
         const handleImportData = (event) => {
@@ -4820,6 +6167,12 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             reader.onload = async (e) => {
                 try {
                     const data = JSON.parse(e.target.result);
+
+                    // 导入会清空当前全部数据且不可撤销，先把备份里的内容摊开让用户确认
+                    const brief = describeBackup(data);
+                    if (!confirm(`即将用这个备份覆盖当前所有数据，且无法撤销。\n\n${brief}\n\n确定继续吗？`)) {
+                        return;
+                    }
 
                     if (data.__fullDump__ && data.data) {
                         // 新版全量备份：清空后逐键恢复
@@ -4988,6 +6341,18 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         
         dom.settingsBtn.addEventListener('click', () => showSettings('general'));
 
+        // 阅读进度保底落盘：滚动保存有 500ms 防抖，手机上「划走 App」/ 切后台 / 关页面时
+        // 那次定时器很可能还没执行，最后一段进度就丢了，下次打开自然回到更早的位置。
+        const flushReadingProgress = () => {
+            if (!getActiveBook()) return;
+            clearTimeout(state.reading.scrollTimeout);
+            saveCurrentBookProgress();
+        };
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') flushReadingProgress();
+        });
+        window.addEventListener('pagehide', flushReadingProgress);
+
         // 角色 / 身份 管理弹窗
         if (dom.profilesBtn) dom.profilesBtn.addEventListener('click', showProfilesModal);
         if (dom.pfCloseBtn) dom.pfCloseBtn.addEventListener('click', hideProfilesModal);
@@ -5094,6 +6459,11 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         if (dom.notesBtn) dom.notesBtn.addEventListener('click', showNotesModal);
         if (dom.ttsBtn) dom.ttsBtn.addEventListener('click', startTts);
 
+        // 阅读概览
+        if (dom.statsBtn) dom.statsBtn.addEventListener('click', showStatsModal);
+        if (dom.closeStatsBtn) dom.closeStatsBtn.addEventListener('click', hideStatsModal);
+        if (dom.statsModal) dom.statsModal.addEventListener('click', (e) => { if (e.target === dom.statsModal) hideStatsModal(); });
+
         // 阅读页「更多」下拉菜单
         const toggleReaderMore = (show) => {
             if (!dom.readerMoreMenu) return;
@@ -5116,6 +6486,29 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         if (dom.notesModal) dom.notesModal.addEventListener('click', (e) => { if (e.target === dom.notesModal) hideNotesModal(); });
         if (dom.exportNotesTxtBtn) dom.exportNotesTxtBtn.addEventListener('click', () => exportNotes('txt'));
         if (dom.exportNotesDocxBtn) dom.exportNotesDocxBtn.addEventListener('click', () => exportNotes('docx'));
+
+        // 读后感 / 感想
+        if (dom.reflectionBtn) dom.reflectionBtn.addEventListener('click', showReflectionModal);
+        if (dom.closeReflectionBtn) dom.closeReflectionBtn.addEventListener('click', hideReflectionModal);
+        if (dom.reflectionModal) dom.reflectionModal.addEventListener('click', (e) => { if (e.target === dom.reflectionModal) hideReflectionModal(); });
+        if (dom.rfTabs) dom.rfTabs.forEach(b => b.addEventListener('click', () => switchReflectionTab(b.dataset.rfTab)));
+        if (dom.rfAuthor) dom.rfAuthor.addEventListener('change', () => {
+            // 换作者时，「已保存」里默认只看 TA 的，所以要重置回第一页
+            reflectionPage = 1;
+            if (dom.rfPaneSaved && dom.rfPaneSaved.style.display !== 'none') renderReflectionList();
+        });
+        if (dom.rfFilterAuthor) dom.rfFilterAuthor.addEventListener('change', () => { reflectionPage = 1; renderReflectionList(); });
+        if (dom.rfFilterBook) dom.rfFilterBook.addEventListener('change', () => { reflectionPage = 1; renderReflectionList(); });
+        if (dom.rfPrevPage) dom.rfPrevPage.addEventListener('click', () => gotoReflectionPage(-1));
+        if (dom.rfNextPage) dom.rfNextPage.addEventListener('click', () => gotoReflectionPage(1));
+        if (dom.rfMode) dom.rfMode.addEventListener('change', applyReflectionModeUI);
+        [dom.rfChapter, dom.rfStart, dom.rfEnd].forEach(sel => { if (sel) sel.addEventListener('change', updateReflectionHint); });
+        if (dom.rfResetPrompt) dom.rfResetPrompt.addEventListener('click', () => { dom.rfPrompt.value = DEFAULT_REFLECTION_PROMPT; });
+        if (dom.rfGenerateBtn) dom.rfGenerateBtn.addEventListener('click', generateReflection);
+        if (dom.rfCopyBtn) dom.rfCopyBtn.addEventListener('click', () => copyReflection(currentReflection));
+        if (dom.rfExportTxtBtn) dom.rfExportTxtBtn.addEventListener('click', () => exportReflection(currentReflection, 'txt'));
+        if (dom.rfExportDocxBtn) dom.rfExportDocxBtn.addEventListener('click', () => exportReflection(currentReflection, 'docx'));
+        if (dom.rfSendChatBtn) dom.rfSendChatBtn.addEventListener('click', () => sendReflectionToChat(currentReflection));
         dom.tocOverlay.addEventListener('click', (e) => { e.stopPropagation(); toggleTOC(false); });
         dom.tocList.addEventListener('click', (e) => {
             const li = e.target.closest('li');
@@ -5127,6 +6520,8 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         });
         
         [dom.readerBgColor, dom.readerFontColor, dom.readerCommentColor, dom.readerUserCommentColor, dom.readerFontSize, dom.readerLineHeight, dom.readerPadding].forEach(el => el.addEventListener('input', updateThemePreview));
+        // 手动改颜色后，预设的「当前」高亮要跟着更新
+        [dom.readerBgColor, dom.readerFontColor, dom.readerCommentColor, dom.readerUserCommentColor].forEach(el => el.addEventListener('change', renderThemePresets));
         dom.readerContentWrapper.addEventListener('scroll', handleReaderScroll);
         dom.readerStatusBar.addEventListener('click', () => { if (state.reading.isStatusBarVisible) { hideStatusBar(); } else { showStatusBar(); } });
         document.addEventListener('click', (e) => {
@@ -5135,7 +6530,8 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         });
         dom.readerContent.addEventListener('click', (e) => {
             const icon = e.target.closest('.comment-icon');
-            if (icon) { showCommentPopup(icon); }
+            // 角标自己消化掉这次点击：既防止冒泡到翻页/划词逻辑，也避免全局监听重复处理
+            if (icon) { e.stopPropagation(); e.preventDefault(); toggleCommentPopup(icon); return; }
             if (e.target.id === 'upload-book-btn-placeholder') { showBookListModal(); }
         });
         document.addEventListener('selectionchange', handleSelectionChange);
@@ -5182,6 +6578,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             await loadOrInitProfiles();   // 建立/迁移角色与身份，并把激活项写入 settings
             await loadChatHistory();      // 载入当前角色的独立聊天
             await loadSummaries();
+            await loadReflections();
             await loadMemories();         // 载入当前角色的独立记忆
             applySettings();              // 依据激活的角色/身份刷新界面
             renderProfiles();
@@ -5387,7 +6784,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 'box-shadow:0 4px 16px rgba(0,0,0,0.3)',
                 'cursor:pointer'
             ].join(';');
-            hint.innerHTML = '想把「陪伴阅读」放到桌面？点这里查看步骤：用 Safari 的「分享 ' + shareIconSvg + ' → 添加到主屏幕」即可全屏使用。';
+            hint.innerHTML = '想把「♡‧₊ ✧ ₊‧♡」放到桌面？点这里查看步骤：用 Safari 的「分享 ' + shareIconSvg + ' → 添加到主屏幕」即可全屏使用。';
             hint.addEventListener('click', (e) => {
                 if (e.target === closeBtn) return;
                 showGuideModal('在 iPhone 上添加到桌面', iosGuideBody);

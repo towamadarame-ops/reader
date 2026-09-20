@@ -1,5 +1,5 @@
 /*
- * 通用 CORS 反向代理 —— 用于「陪伴阅读」的 MiniMax TTS 直连被浏览器跨域(CORS)拦截时。
+ * 通用 CORS 反向代理 —— 用于「♡‧₊ ✧ ₊‧♡」的 MiniMax TTS 直连被浏览器跨域(CORS)拦截时。
  *
  * 【部署步骤（约 3 分钟，免费）】
  * 1. 打开 https://dash.cloudflare.com/ ，登录（没有账号先免费注册）。
