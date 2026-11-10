@@ -7,7 +7,7 @@
 
     <!-- 版本标记：修复页(reset.html)靠它判断浏览器加载的到底是新版还是缓存里的旧版。
          每次改完代码上传前，把这里的日期/序号往后改一位即可。 -->
-    <meta name="app-build" content="2026-09-11-a">
+    <meta name="app-build" content="2026-11-10-d">
 
     <!-- PWA 配置 - iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -46,22 +46,30 @@
         (function () {
             'use strict';
 
-            // ---- 自救通道：地址后面加 ?reset=1 可强制清掉 Service Worker 与全部缓存 ----
+            // ---- 自救通道：地址后面加 ?reset=1 可强制清掉本 App 的 Service Worker 与缓存 ----
             // 手机被旧版本缓存卡住、或者更新后打开还是老界面时用这个。
+            // 只动自己的：同一个 xxx.github.io 下的其它 App（比如私享衣橱）共用同一个网站存储，
+            // 以前是一锅端，会把它们的离线缓存和后台脚本也一起清掉。
             if (/[?&]reset=1\b/.test(location.search)) {
                 var done = function () {
                     location.replace(location.pathname); // 去掉参数后重新打开
                 };
+                // 本 App 所在目录，形如 https://xxx.github.io/reader/ ，也就是本 App 的 SW 作用域
+                var appDir = location.href.split(/[?#]/)[0].replace(/[^\/]*$/, '');
                 var jobs = [];
                 try {
                     if (window.caches && caches.keys) {
                         jobs.push(caches.keys().then(function (keys) {
-                            return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                            return Promise.all(keys.filter(function (k) {
+                                return k.indexOf('peiban-reader-') === 0;   // 跟 sw.js 里的 CACHE_PREFIX 一致
+                            }).map(function (k) { return caches.delete(k); }));
                         }));
                     }
                     if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
                         jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
-                            return Promise.all(rs.map(function (r) { return r.unregister(); }));
+                            return Promise.all(rs.filter(function (r) {
+                                return r.scope === appDir;
+                            }).map(function (r) { return r.unregister(); }));
                         }));
                     }
                 } catch (e) { /* 老浏览器直接跳过 */ }
@@ -494,6 +502,8 @@
         .summary-progress-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background-color: #f7f7f7; border-bottom: 1px solid #eee; }
         .summary-progress-header h5 { margin: 0; font-size: 14px; }
         .summary-progress-header .toggle-btn { background: none; border: none; cursor: pointer; padding: 5px; }
+        .summary-stop-btn { margin-left: auto; margin-right: 6px; border: none; border-radius: 10px; padding: 3px 10px; font-size: 12px; background-color: #e57373; color: #fff; cursor: pointer; font-family: inherit; }
+        .summary-stop-btn[disabled] { opacity: 0.6; cursor: default; }
         .summary-progress-header .toggle-btn svg { width: 18px; height: 18px; fill: var(--secondary-text-color); transition: transform 0.2s; }
         .summary-progress-content { padding: 15px; font-size: 14px; line-height: 1.6; max-height: 150px; overflow-y: auto; transition: max-height 0.3s, padding 0.3s; }
         #summary-progress-modal.collapsed .summary-progress-content { max-height: 0; padding-top: 0; padding-bottom: 0; }
@@ -722,11 +732,58 @@
             transition: opacity 0.15s ease;
         }
         .rnav-slider-tip.show { opacity: 1; }
-        .rnav-toc-entry { text-align: center; }
-        .rnav-toc-entry button {
-            background: none; border: none; color: var(--accent-color);
-            font-size: 13px; cursor: pointer; padding: 4px 10px;
+        .rnav-actions { display: flex; justify-content: space-around; align-items: center; }
+        .rnav-actions button {
+            display: flex; flex-direction: column; align-items: center; gap: 3px;
+            background: none; border: none; color: var(--primary-text-color);
+            font-size: 12px; cursor: pointer; padding: 4px 12px; font-family: inherit;
         }
+        .rnav-actions button svg { width: 22px; height: 22px; fill: var(--accent-color); }
+        .rnav-actions button.on svg { fill: #e8a33d; }
+
+        /* 目录面板顶部「目录 / 书签」切换 */
+        .toc-tabs { display: flex; padding: 0; }
+        .toc-tab { flex: 1; padding: 15px 10px; background: none; border: none; font-size: 16px; font-family: inherit; color: var(--secondary-text-color); cursor: pointer; }
+        .toc-tab.active { color: var(--primary-text-color); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent-color); }
+        .bookmark-list li.bm-item { display: flex; align-items: flex-start; gap: 8px; white-space: normal; padding: 12px 14px 12px 20px; }
+        .bookmark-list .bm-main { flex: 1; min-width: 0; }
+        .bookmark-list .bm-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bookmark-list .bm-text { font-size: 12.5px; color: var(--secondary-text-color); margin-top: 3px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .bookmark-list .bm-time { font-size: 11px; color: #aaa; margin-top: 3px; }
+        .bookmark-list .bm-del { flex-shrink: 0; border: none; background: none; color: #bbb; font-size: 20px; line-height: 1; padding: 2px 6px; cursor: pointer; }
+        .bookmark-list li.bm-empty { white-space: normal; color: var(--secondary-text-color); font-size: 13px; line-height: 1.7; cursor: default; border-bottom: none; }
+        .bookmark-list li.bm-empty:hover { background: none; }
+
+        /* ===== 夜间模式 =====
+           只作用于阅读界面（正文、顶栏、目录、导航面板、更多菜单、伴侣气泡、批注弹窗、阅读时的底栏），
+           聊天页、设置页和各种弹窗保持原样：那些地方颜色写死的很多，强行变暗容易出现看不清的字。
+           正文的背景色 / 字色由 JS 直接换掉（见 applyReaderColors），不会改动你在「主题定制」里调的白天配色。 */
+        html.night-mode #reader-view .top-bar { background-color: #232428; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+        html.night-mode #reader-view .top-bar .title { color: #c8c8c8; }
+        html.night-mode #reader-view .top-bar .icon-btn svg { fill: #9a9a9a; }
+        html.night-mode .reader-more-menu { background: #2a2b2f; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+        html.night-mode .reader-more-menu button { color: #d0d0d0; }
+        html.night-mode .reader-more-menu button:hover, html.night-mode .reader-more-menu button:active { background: #36373c; }
+        html.night-mode .toc-panel { background-color: #232428; color: #c8c8c8; box-shadow: 2px 0 12px rgba(0,0,0,0.5); }
+        html.night-mode .toc-header { border-bottom-color: #2f3035; }
+        html.night-mode .toc-tab.active { color: #e0e0e0; }
+        html.night-mode .toc-list li { border-bottom-color: #2c2d31; }
+        html.night-mode .toc-list li:hover { background-color: #2c2d31; }
+        html.night-mode .bookmark-list .bm-time { color: #666; }
+        html.night-mode .reader-nav-menu { background-color: #232428; box-shadow: 0 -3px 18px rgba(0,0,0,0.5); }
+        html.night-mode .rnav-chapter-btn, html.night-mode .rnav-actions button { color: #c8c8c8; }
+        html.night-mode .rnav-chapter-btn:disabled { color: #555; }
+        html.night-mode .rnav-slider { background: #3a3b40; }
+        html.night-mode .reader-status-bar { color: #8a8a8a; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        html.night-mode .reader-progress-bar { background-color: rgba(255,255,255,0.08); }
+        html.night-mode #reader-bubble { background: rgba(40,41,45,0.97); border-color: rgba(255,255,255,0.06); }
+        html.night-mode #reader-bubble .rb-text { color: #d6d6d6; }
+        html.night-mode #reader-bubble .rb-dismiss { background-color: #3a3b40; color: #bbb; }
+        html.night-mode .comment-popup { background-color: #2a2b2f; color: #d6d6d6; border-color: #3a3b40; }
+        html.night-mode .comment-popup .comment-body { border-top-color: #3a3b40; }
+        html.night-mode .upload-placeholder svg { fill: #555; }
+        html.night-mode.reading-active .bottom-nav { background-color: #232428; box-shadow: 0 -2px 6px rgba(0,0,0,0.4); }
+        html.night-mode.reading-active .app-container { background-color: #1b1c1f; }
 
         /* 角色 / 身份 管理弹窗 */
         #profiles-modal { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; padding: 20px; }
@@ -810,6 +867,8 @@
                                 <button id="notes-btn"><svg viewBox="0 0 24 24"><path d="M17,3H7A2,2 0 0,0 5,5V21L12,18L19,21V5A2,2 0 0,0 17,3M17,18L12,15.82L7,18V5H17V18M8,7H16V9H8V7M8,11H16V13H8V11Z" /></svg>书籍笔记</button>
                                 <button id="reflection-btn"><svg viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z" /></svg>读后感</button>
                                 <button id="tts-btn"><svg viewBox="0 0 24 24"><path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z" /></svg>朗读本页</button>
+                                <button id="bookmarks-btn"><svg viewBox="0 0 24 24"><path d="M17,3H7A2,2 0 0,0 5,5V21L12,18L19,21V5C19,3.89 18.1,3 17,3M17,18L12,15.82L7,18V5H17V18Z" /></svg>书签</button>
+                                <button id="night-mode-btn"><svg viewBox="0 0 24 24"><path d="M9,2C7.95,2 6.95,2.16 6,2.46C10.06,3.73 13,7.5 13,12C13,16.5 10.06,20.27 6,21.54C6.95,21.84 7.95,22 9,22A10,10 0 0,0 19,12A10,10 0 0,0 9,2Z" /></svg><span class="night-label">夜间模式</span></button>
                             </div>
                         </div>
                     </div>
@@ -833,8 +892,12 @@
                     <button id="tts-stop" title="停止"><svg viewBox="0 0 24 24"><path d="M18,18H6V6H18V18Z" /></svg></button>
                 </div>
                 <div class="toc-panel" id="toc-panel">
-                    <div class="toc-header">目录</div>
+                    <div class="toc-header toc-tabs">
+                        <button type="button" class="toc-tab active" data-tab="toc">目录</button>
+                        <button type="button" class="toc-tab" data-tab="bookmarks">书签</button>
+                    </div>
                     <ul class="toc-list" id="toc-list"></ul>
+                    <ul class="toc-list bookmark-list" id="bookmark-list" style="display:none"></ul>
                 </div>
             </div>
 
@@ -964,6 +1027,10 @@
                     <div class="settings-group sg-char">
                         <h3>阅读陪伴</h3>
                         <div class="form-item">
+                            <label for="auto-comment-enabled">随读随评（滚动阅读时，TA 偶尔自己在书页边写一句点评；每条都会调用一次聊天接口）</label>
+                            <input type="checkbox" id="auto-comment-enabled">
+                        </div>
+                        <div class="form-item">
                             <label for="care-enabled">久读关心（连续阅读一段时间后主动提醒休息）</label>
                             <input type="checkbox" id="care-enabled">
                         </div>
@@ -1020,6 +1087,7 @@
                     </div>
                     <div class="settings-group">
                         <h3>主题定制</h3>
+                        <p style="font-size:12px;color:var(--secondary-text-color);margin:0 0 8px;">这里调的是白天的配色。夜间模式在阅读页点屏幕中间，或「更多」菜单里一键切换，不会改掉这里的设置。</p>
                         <div class="theme-customization">
                             <div class="theme-controls">
                                 <div class="form-item"><label>背景颜色</label><input type="color" id="reader-bg-color"></div>
@@ -1069,9 +1137,11 @@
                         <div class="form-item">
                             <label for="book-encoding">书籍编码</label>
                             <select id="book-encoding">
+                                <option value="auto">自动识别（推荐）</option>
                                 <option value="UTF-8">UTF-8 (通用)</option>
                                 <option value="GBK">GBK (中文旧编码)</option>
                             </select>
+                            <p style="font-size:12px;color:var(--secondary-text-color);margin:6px 0 0;">自动识别会先按 UTF-8 读，读不通再换 GBK。只有导入后还是乱码时，才需要在这里手动指定再重新导入。</p>
                         </div>
                         <div class="form-item">
                             <label for="pagination-mode">翻页模式</label>
@@ -1079,6 +1149,10 @@
                                 <option value="scroll">上下滚动</option>
                                 <option value="flip">左右翻页 (仿真)</option>
                             </select>
+                        </div>
+                        <div class="form-item">
+                            <label for="keep-screen-on">阅读时屏幕常亮（10 分钟没碰屏幕会自动放开，睡着了也不会一直亮着）</label>
+                            <input type="checkbox" id="keep-screen-on">
                         </div>
                     </div>
                     <div class="settings-group">
@@ -1097,6 +1171,8 @@
                                 <button id="export-data-btn" class="inline-btn action-btn">导出数据</button>
                                 <button id="import-data-btn" class="inline-btn action-btn">导入数据</button>
                             </div>
+                            <!-- 上次备份 / 占用空间 / 持久保存状态，打开设置时刷新 -->
+                            <div id="storage-status" style="font-size:12px;color:var(--secondary-text-color);line-height:1.7;margin-top:8px;"></div>
                         </div>
                         <div class="form-item">
                             <label>聊天记录</label>
@@ -1141,7 +1217,11 @@
             </div>
             <button class="rnav-chapter-btn" id="rnav-next-chapter">下一章</button>
         </div>
-        <div class="rnav-toc-entry"><button id="rnav-toc-btn">打开目录</button></div>
+        <div class="rnav-actions">
+            <button type="button" id="rnav-bookmark-btn"><svg viewBox="0 0 24 24"><path class="bm-icon-path" d="M17,3H7A2,2 0 0,0 5,5V21L12,18L19,21V5C19,3.89 18.1,3 17,3M17,18L12,15.82L7,18V5H17V18Z" /></svg><span class="bm-label">加书签</span></button>
+            <button type="button" id="rnav-night-btn"><svg viewBox="0 0 24 24"><path d="M9,2C7.95,2 6.95,2.16 6,2.46C10.06,3.73 13,7.5 13,12C13,16.5 10.06,20.27 6,21.54C6.95,21.84 7.95,22 9,22A10,10 0 0,0 19,12A10,10 0 0,0 9,2Z" /></svg><span class="night-label">夜间模式</span></button>
+            <button type="button" id="rnav-toc-btn"><svg viewBox="0 0 24 24"><path d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z" /></svg><span>目录</span></button>
+        </div>
     </div>
 
     <!-- 角色 / 身份 管理弹窗 -->
@@ -1338,6 +1418,7 @@
     <div id="summary-progress-modal">
         <div class="summary-progress-header">
             <h5 id="summary-progress-title">生成摘要</h5>
+            <button class="summary-stop-btn" id="summary-progress-stop" type="button" style="display:none">停止</button>
             <button class="toggle-btn" id="summary-progress-toggle">
                 <svg viewBox="0 0 24 24"><path d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z"/></svg>
             </button>
@@ -1390,10 +1471,18 @@
         const icon192 = makeIcon(192);
         const icon512 = makeIcon(512);
         
+        // manifest 是 blob: 临时地址，"." 这种相对路径没法相对它解析，Chrome 会判定 start_url 无效，
+        // 退回拿「当前打开的网址」当 App 的身份。于是从 /reader/、/reader/index.html、
+        // 修复页跳回来的 ?__fresh=… 打开，都会被当成不同的 App，安装状态容易错乱，
+        // 甚至出现「显示已安装、点打开又打不开」的死循环。所以一律写绝对地址，并固定 id。
+        // id 取目录地址：跟以前大多数人从目录网址安装时 Chrome 自动记下的身份一致，已装的不受影响。
+        const appDir = location.href.split(/[?#]/)[0].replace(/[^\/]*$/, '');
         const manifest = {
+            "id": appDir,
             "name": "♡‧₊ ✧ ₊‧♡",
             "short_name": "♡‧₊ ✧ ₊‧♡",
-            "start_url": ".",
+            "start_url": appDir,
+            "scope": appDir,
             "display": "standalone",
             "background_color": "#e0eee8",
             "theme_color": "#e0eee8",
@@ -1403,9 +1492,20 @@
                 { "src": icon512, "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
             ]
         };
+        // 出现在手机文件管理器的「分享」菜单里：选一个或几个 TXT → 分享 → 本 App，直接导入书架。
+        // 文件是 POST 过来的，由 sw.js 接住再把页面打开成 ?share=1（见主脚本里的 takeSharedBooks）。
+        // 只有装到桌面（安卓 Chrome）后才会出现；直接双击打开文件时没有 Service Worker，不加。
+        if (location.protocol.indexOf('http') === 0) {
+            manifest.share_target = {
+                "action": appDir + "share-target",
+                "method": "POST",
+                "enctype": "multipart/form-data",
+                "params": { "files": [{ "name": "books", "accept": ["text/plain", ".txt"] }] }
+            };
+        }
         
         const stringManifest = JSON.stringify(manifest);
-        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const blob = new Blob([stringManifest], {type: 'application/manifest+json'});
         const manifestURL = URL.createObjectURL(blob);
         document.getElementById('app-manifest').setAttribute('href', manifestURL);
         document.getElementById('app-icon').setAttribute('href', icon192);
@@ -1536,6 +1636,7 @@
             memoryAutoRounds: document.getElementById('memory-auto-rounds'),
             memoryListContainer: document.getElementById('memory-list-container'),
             memorySummarizeNowBtn: document.getElementById('memory-summarize-now-btn'),
+            autoCommentEnabled: document.getElementById('auto-comment-enabled'),
             careEnabled: document.getElementById('care-enabled'),
             careMinutes: document.getElementById('care-minutes'),
             moodEnabled: document.getElementById('mood-enabled'),
@@ -1567,6 +1668,7 @@
             readerBgImageInput: document.getElementById('reader-bg-image-input'),
             bookEncoding: document.getElementById('book-encoding'),
             paginationMode: document.getElementById('pagination-mode'),
+            keepScreenOn: document.getElementById('keep-screen-on'),
             themePreview: document.getElementById('theme-preview'),
             themePreviewText: document.getElementById('theme-preview-text'),
             selectionMenu: document.getElementById('selection-menu'),
@@ -1647,6 +1749,7 @@
                     autoSummarizeRounds: 20,  // 每多少轮自动总结一次记忆（0=关闭自动）
                 },
                 companion: {
+                    autoCommentEnabled: true, // 随读随评：滚动阅读时偶尔自动点评一句（会调用接口）
                     careEnabled: true,        // 久读关心提醒
                     careMinutes: 30,          // 连续阅读多少分钟提醒一次
                     moodEnabled: true,        // 共读心情（进入新章节时分享情绪）
@@ -1674,11 +1777,14 @@
                     readerCommentColor: '#a3ccc4',
                     readerUserCommentColor: '#f7c5a8',
                     readerBgImage: 'none',
+                    nightMode: false,         // 一键夜间模式（只换阅读界面的颜色，不改上面的白天配色）
                 },
                 reading: {
-                    bookEncoding: 'GBK',
+                    bookEncoding: 'auto',     // 'auto'（先 UTF-8，读不通再 GBK）| 'UTF-8' | 'GBK'
+                    encodingAutoMigrated: true,
                     autoGenerateSummaries: false,
                     paginationMode: 'scroll', // 'scroll' or 'flip'
+                    keepScreenOn: true,       // 阅读时屏幕常亮（闲置 10 分钟自动放开）
                     reflectionWords: 500,     // 读后感默认字数
                     reflectionPrompt: '',     // 读后感自定义提示词（空=用默认）
                 }
@@ -2246,6 +2352,8 @@
         const showReaderNav = () => {
             if (!getActiveBook()) return;
             syncNavMenu();
+            refreshBookmarkBtn();   // 当前位置有没有书签，按钮显示「加书签」还是「已加书签」
+            updateNightButtons();
             dom.readerNavMenu.classList.add('show');
             state.reading.isNavMenuVisible = true;
             hideStatusBar(); // 面板已含章节与进度信息，收起底部状态栏避免重叠
@@ -2282,6 +2390,10 @@
             dom.views.forEach(v => v.classList.remove('active'));
             document.getElementById(viewId).classList.add('active');
             dom.navItems.forEach(item => item.classList.toggle('active', item.dataset.view === viewId));
+            // 夜间模式下，阅读时底栏也一起变暗；状态栏颜色、屏幕常亮都跟着当前页面走
+            document.documentElement.classList.toggle('reading-active', viewId === 'reader-view');
+            syncThemeColorMeta();
+            ScreenAwake.sync();
             if (viewId !== 'reader-view') {
                 hideSelectionMenu();
                 hideReaderNav();
@@ -2323,6 +2435,8 @@
                     : '设置';
             }
             dom.settingsView.classList.add('active');
+            // 刷新「数据管理」下面的上次备份 / 占用空间 / 持久保存状态
+            try { renderStorageStatus(); } catch (e) { /* 只是少显示几行状态 */ }
         };
         const showCharacterSettings = () => showSettings('char');
         const hideSettings = () => {
@@ -2447,6 +2561,7 @@
                     autoSummarizeRounds: Math.max(0, parseInt(dom.memoryAutoRounds.value, 10) || 0),
                 };
                 state.settings.companion = {
+                    autoCommentEnabled: dom.autoCommentEnabled ? dom.autoCommentEnabled.checked : true,
                     careEnabled: dom.careEnabled.checked,
                     careMinutes: Math.max(1, parseInt(dom.careMinutes.value, 10) || 30),
                     moodEnabled: dom.moodEnabled.checked,
@@ -2478,6 +2593,7 @@
                 state.settings.theme.readerPadding = dom.readerPadding.value;
                 state.settings.reading.bookEncoding = dom.bookEncoding.value;
                 state.settings.reading.paginationMode = dom.paginationMode.value;
+                if (dom.keepScreenOn) state.settings.reading.keepScreenOn = dom.keepScreenOn.checked;
                 state.settings.reading.autoGenerateSummaries = dom.autoSummaryToggle.checked;
                 // 排版参数变了 → 段落高度估算失效，需要按新规则重建渲染窗口
                 const layoutChanged = prevFontSize !== state.settings.theme.readerFontSize
@@ -2507,7 +2623,12 @@
             state.settings.apiPresets.forEach((preset, index) => {
                 const tag = document.createElement('div');
                 tag.className = 'preset-tag';
-                tag.innerHTML = `${preset.name} <span class="delete-preset" data-index="${index}">×</span>`;
+                tag.appendChild(document.createTextNode(`${preset.name} `));
+                const del = document.createElement('span');
+                del.className = 'delete-preset';
+                del.dataset.index = index;
+                del.textContent = '×';
+                tag.appendChild(del);
                 tag.addEventListener('click', (e) => {
                     if (e.target.classList.contains('delete-preset')) {
                         e.stopPropagation();
@@ -2569,18 +2690,19 @@
             dom.fetchModelsBtn.disabled = true;
 
             try {
-                const response = await fetch(`${url}/models`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${key}`,
-                        'Content-Type': 'application/json'
-                    }
+                const data = await withTimeout(20000, async (signal) => {
+                    const response = await fetch(`${url}/models`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${key}`,
+                            'Content-Type': 'application/json'
+                        },
+                        signal
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.json();
                 });
-
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-                const data = await response.json();
-                const models = Array.isArray(data) ? data : (data.data || []);
+                const models = Array.isArray(data) ? data : ((data && data.data) || []);
 
                 dom.apiModelSelect.innerHTML = '<option value="" disabled selected>请选择模型...</option>'; // Reset
                 if (models.length === 0) {
@@ -2617,11 +2739,12 @@
             dom.testConnectionBtn.disabled = true;
             const startTime = Date.now();
             try {
-                const response = await fetch(`${url}/chat/completions`, {
+                const response = await withTimeout(30000, (signal) => fetch(`${url}/chat/completions`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model: model, messages: [{ role: 'user', content: 'test' }], max_tokens: 1 })
-                });
+                    body: JSON.stringify({ model: model, messages: [{ role: 'user', content: 'test' }], max_tokens: 1 }),
+                    signal
+                }));
                 const duration = Date.now() - startTime;
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 alert(`✅ 连接成功！\n延迟: ${duration}ms`);
@@ -2658,6 +2781,12 @@
                     const mergedSettings = { ...state.settings, ...parsed };
                     mergedSettings.theme = { ...state.settings.theme, ...(parsed.theme || {}) };
                     mergedSettings.reading = { ...state.settings.reading, ...(parsed.reading || {}) };
+                    // 以前默认是 GBK，绝大多数人存下的「GBK」其实只是没改过的默认值。
+                    // 一次性换成自动识别：GBK 的书照样能认出来，UTF-8 的书也不会再乱码。
+                    if (!(parsed.reading || {}).encodingAutoMigrated) {
+                        if (mergedSettings.reading.bookEncoding === 'GBK') mergedSettings.reading.bookEncoding = 'auto';
+                        mergedSettings.reading.encodingAutoMigrated = true;
+                    }
                     mergedSettings.rp = { ...state.settings.rp, ...(parsed.rp || {}) };
                     mergedSettings.memory = { ...state.settings.memory, ...(parsed.memory || {}) };
                     mergedSettings.companion = { ...state.settings.companion, ...(parsed.companion || {}) };
@@ -2671,6 +2800,85 @@
             }
             applySettings();
         };
+
+        // ===== 一键夜间模式 =====
+        // 只换阅读界面的颜色；「主题定制」里调的白天配色原样留着，关掉夜间模式就回来。
+        const NIGHT_COLORS = { bg: '#1b1c1f', font: '#b9b9b9', bar: '#1b1c1f' };
+        const DAY_THEME_COLOR = '#e0eee8';
+        const isReaderActive = () => { const v = document.querySelector('.view.active'); return !!v && v.id === 'reader-view'; };
+        // 手机状态栏（装到桌面后）跟着变暗，不然顶上一条亮绿色很刺眼
+        const syncThemeColorMeta = () => {
+            const meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', (state.settings.theme || {}).nightMode && isReaderActive() ? NIGHT_COLORS.bar : DAY_THEME_COLOR);
+        };
+        const updateNightButtons = () => {
+            const night = !!(state.settings.theme || {}).nightMode;
+            document.querySelectorAll('.night-label').forEach(el => { el.textContent = night ? '日间模式' : '夜间模式'; });
+            const b = document.getElementById('rnav-night-btn');
+            if (b) b.classList.toggle('on', night);
+        };
+        const applyReaderColors = () => {
+            const root = document.documentElement;
+            const t = state.settings.theme || {};
+            const night = !!t.nightMode;
+            root.classList.toggle('night-mode', night);
+            // 夜间不用背景图：图片多半是浅色的，盖上去字就看不清了
+            root.style.setProperty('--reader-bg', night ? NIGHT_COLORS.bg : (t.readerBgImage && t.readerBgImage !== 'none' ? `url(${t.readerBgImage})` : t.readerBg));
+            root.style.setProperty('--reader-font-color', night ? NIGHT_COLORS.font : t.readerFontColor);
+            syncThemeColorMeta();
+            updateNightButtons();
+        };
+        const toggleNightMode = async () => {
+            if (!state.settings.theme) state.settings.theme = {};
+            state.settings.theme.nightMode = !state.settings.theme.nightMode;
+            applyReaderColors();
+            // 只存这一项开关的结果，不去读设置页表单（表单里可能有还没点「保存」的改动）
+            try { await localforage.setItem('readingCompanionSettings', state.settings); } catch (e) { console.warn('[夜间模式] 保存失败', e); }
+        };
+
+        // ===== 阅读时屏幕常亮 =====
+        // 在阅读页时向系统要一个「屏幕保持唤醒」；离开阅读页、切到后台、关掉开关时放开。
+        // 10 分钟没碰屏幕也会放开，免得看着看着睡着了屏幕亮一整夜；再碰一下屏幕又会重新常亮。
+        const ScreenAwake = (() => {
+            const IDLE_MS = 10 * 60 * 1000;
+            let lock = null, pending = false, lastActive = Date.now(), timer = null, failedAt = 0;
+            const supported = () => !!(navigator.wakeLock && typeof navigator.wakeLock.request === 'function');
+            const wanted = () => (state.settings.reading || {}).keepScreenOn !== false
+                && document.visibilityState === 'visible'
+                && isReaderActive() && !!getActiveBook()
+                && Date.now() - lastActive < IDLE_MS;
+            const release = () => { const l = lock; lock = null; if (l) l.release().catch(() => {}); };
+            const sync = async () => {
+                if (!supported()) return;
+                // 在阅读页时每 30 秒看一眼有没有闲置超时；离开阅读页就不用看了
+                if (isReaderActive() && !timer) timer = setInterval(sync, 30000);
+                else if (!isReaderActive() && timer) { clearInterval(timer); timer = null; }
+                if (!wanted()) { release(); return; }
+                // 被系统拒绝过（比如开着省电模式）就隔一分钟再试，别每次滚动都去要
+                if (lock || pending || Date.now() - failedAt < 60000) return;
+                pending = true;
+                try {
+                    const l = await navigator.wakeLock.request('screen');
+                    if (!wanted()) { l.release().catch(() => {}); }
+                    else {
+                        lock = l;
+                        // 切到后台时系统会自动收回，这里跟着清掉，回到前台再要
+                        l.addEventListener('release', () => { if (lock === l) lock = null; });
+                    }
+                } catch (e) { failedAt = Date.now(); }
+                finally { pending = false; }
+            };
+            const activity = () => {
+                const wasIdle = Date.now() - lastActive >= IDLE_MS;
+                lastActive = Date.now();
+                if (wasIdle || !lock) sync();
+            };
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') lastActive = Date.now();
+                sync();
+            });
+            return { sync, activity };
+        })();
 
         const applySettings = () => {
             const root = document.documentElement;
@@ -2701,6 +2909,7 @@
             dom.memoryAutoRounds.value = (mem.autoSummarizeRounds === undefined ? 20 : mem.autoSummarizeRounds);
             renderMemoryList();
             const comp = state.settings.companion || {};
+            if (dom.autoCommentEnabled) dom.autoCommentEnabled.checked = comp.autoCommentEnabled !== false;
             dom.careEnabled.checked = comp.careEnabled !== false;
             dom.careMinutes.value = comp.careMinutes || 30;
             dom.moodEnabled.checked = comp.moodEnabled !== false;
@@ -2738,10 +2947,11 @@
 
             dom.bookEncoding.value = state.settings.reading.bookEncoding;
             dom.paginationMode.value = state.settings.reading.paginationMode || 'scroll';
+            if (dom.keepScreenOn) dom.keepScreenOn.checked = state.settings.reading.keepScreenOn !== false;
             dom.autoSummaryToggle.checked = state.settings.reading.autoGenerateSummaries;
             
-            root.style.setProperty('--reader-bg', state.settings.theme.readerBgImage !== 'none' ? `url(${state.settings.theme.readerBgImage})` : state.settings.theme.readerBg);
-            root.style.setProperty('--reader-font-color', state.settings.theme.readerFontColor);
+            // 正文背景色 / 字色：夜间模式开着时换成夜间配色，否则用「主题定制」里的白天配色
+            applyReaderColors();
             const READER_FONT_STACKS = {
                 hei: '-apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif',
                 song: '"Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif',
@@ -2766,6 +2976,7 @@
 
             applyPaginationMode();
             updateThemePreview();
+            ScreenAwake.sync();   // 「阅读时屏幕常亮」开关可能刚改过
         };
 
         /* ============ 多角色 / 多身份 档案系统 ============ */
@@ -3085,6 +3296,49 @@
             dom.paddingValue.textContent = dom.readerPadding.value;
         };
 
+        // ===== 聊天消息的安全显示 =====
+        // 消息内容会存进聊天记录，再以 HTML 显示（引用原文用 <div class="quote"> 包着）。
+        // 以前用户输入、AI 回复、书里的原文都直接拼进 HTML：
+        //   - 打的 <xxx> 这种文字会直接消失；
+        //   - AI 回复或 TXT 原文里夹带的 <img onerror=…> 之类会被执行，能读到本地存的 API Key。
+        // 现在两道保险：
+        //   1) 新消息在拼 HTML 之前，文字部分一律用 escapeHtml 转义；
+        //   2) 显示时再用白名单清理一遍（老聊天记录里已经存着的内容也照样安全），
+        //      不认识的标签不执行、也不吞掉，按原样当文字显示出来。
+        const escapeHtml = (s) => String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        // 消息 HTML → 纯文字（发给 AI、做记忆总结用）：标签换成空格，再把 &lt; 之类还原
+        const htmlToPlain = (html) => String(html || '')
+            .replace(/<[^>]*>?/gm, ' ')
+            .replace(/&(lt|gt|quot|#39|nbsp|amp);/g, (m, e) => ({ lt: '<', gt: '>', quot: '"', '#39': "'", nbsp: ' ', amp: '&' })[e])
+            .replace(/\s+/g, ' ').trim();
+        const MSG_ALLOWED_TAGS = new Set(['BR', 'DIV', 'SPAN', 'P', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'DEL', 'SMALL', 'SUB', 'SUP', 'BLOCKQUOTE']);
+        const MSG_ALLOWED_CLASSES = new Set(['quote', 'rp-action']);
+        const sanitizeMessageHtml = (html) => {
+            // <template> 里的内容是「惰性」的：脚本不执行、图片不加载、onerror 不触发，可以放心先解析再清理
+            const tpl = document.createElement('template');
+            tpl.innerHTML = String(html == null ? '' : html);
+            const clean = (parent) => {
+                Array.from(parent.childNodes).forEach(node => {
+                    if (node.nodeType === Node.TEXT_NODE) return;
+                    if (node.nodeType !== Node.ELEMENT_NODE) { node.remove(); return; }   // 注释等
+                    if (!MSG_ALLOWED_TAGS.has(node.tagName)) {
+                        // 不认识的标签：原样显示成文字，不执行也不吞掉
+                        parent.replaceChild(document.createTextNode(node.outerHTML), node);
+                        return;
+                    }
+                    // 认识的标签也只留 class（且只留白名单里的），onclick / style / href 之类全部去掉
+                    const keep = (node.getAttribute('class') || '').split(/\s+/).filter(c => MSG_ALLOWED_CLASSES.has(c));
+                    Array.from(node.attributes).forEach(a => node.removeAttribute(a.name));
+                    if (keep.length) node.setAttribute('class', keep.join(' '));
+                    clean(node);
+                });
+            };
+            clean(tpl.content);
+            return document.importNode(tpl.content, true);
+        };
+
         // 将文本中的 （…） 和 *…* 动作/神态描写渲染为斜体灰字（只处理文本节点，避免破坏已有标签）
         const decorateRoleplayActions = (containerEl) => {
             if (!containerEl) return;
@@ -3127,7 +3381,8 @@
                 }
                 return;
             }
-            removeTypingIndicator();
+            // 从存储里画旧消息时不碰「正在输入」：往上翻看更早的消息时，TA 可能正在回复
+            if (!fromStorage) removeTypingIndicator();
             const wrapper = document.createElement('div');
             wrapper.className = `message-wrapper ${sender}`;
             wrapper.dataset.timestamp = timestamp;
@@ -3136,9 +3391,18 @@
             const tsDate = new Date(timestamp);
             const timeString = `${(tsDate.getMonth() + 1).toString().padStart(2, '0')}-${tsDate.getDate().toString().padStart(2, '0')} ${tsDate.getHours().toString().padStart(2, '0')}:${tsDate.getMinutes().toString().padStart(2, '0')}`;
             if (sender === 'user' || sender === 'ai') {
-                const avatarSrc = sender === 'user' ? state.settings.userAvatar : state.settings.aiAvatar;
-                messageEl.innerHTML = `<img src="${avatarSrc}" class="avatar" data-sender="${sender}" onclick="handleAvatarClick('${sender}')"><div class="message-content">${content}</div>`;
-                decorateRoleplayActions(messageEl.querySelector('.message-content'));
+                // 逐个建元素而不是拼 HTML 字符串：头像地址里带引号也不会把标签撑破
+                const avatar = document.createElement('img');
+                avatar.className = 'avatar';
+                avatar.src = (sender === 'user' ? state.settings.userAvatar : state.settings.aiAvatar) || '';
+                avatar.dataset.sender = sender;
+                avatar.addEventListener('click', () => window.handleAvatarClick(sender));
+                const contentEl = document.createElement('div');
+                contentEl.className = 'message-content';
+                contentEl.appendChild(sanitizeMessageHtml(content));
+                messageEl.appendChild(avatar);
+                messageEl.appendChild(contentEl);
+                decorateRoleplayActions(contentEl);
             } else {
                 messageEl.textContent = content;
             }
@@ -3200,7 +3464,8 @@
             const indicatorContainer = document.createElement('div');
             indicatorContainer.id = 'typing-indicator-container';
             indicatorContainer.className = 'message ai';
-            indicatorContainer.innerHTML = `<img src="${state.settings.aiAvatar}" class="avatar" data-sender="ai"><div class="typing-indicator"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+            indicatorContainer.innerHTML = `<img class="avatar" data-sender="ai"><div class="typing-indicator"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+            indicatorContainer.querySelector('img').src = state.settings.aiAvatar || '';
             const wrapper = document.createElement('div');
             wrapper.className = 'message-wrapper ai';
             wrapper.appendChild(indicatorContainer);
@@ -3211,32 +3476,58 @@
         const handleSendMessage = () => {
             const text = dom.messageInput.value.trim();
             if (!text) return;
-            addMessage('user', text, { addToHistory: true });
+            addMessage('user', escapeHtml(text), { addToHistory: true });
             dom.messageInput.value = '';
             getChatResponse({ userMessage: text });
         };
 
-        const callAIApi = async (messages, apiType = 'chat') => { /* same code */
+        // 给一次网络请求加超时。以前没有超时：接口卡住时「正在输入」一直转、「点评本章」按钮一直灰着，
+        // 只能刷新页面。超时后会真正中断请求（连同读取返回内容），并抛出一个能看懂的错误。
+        // run(signal) 里要把 signal 传给 fetch；读响应体（json()）也要放在 run 里，一起受超时管。
+        const withTimeout = (ms, run) => {
+            const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+            let timer;
+            const timeout = new Promise((_, reject) => {
+                timer = setTimeout(() => {
+                    if (ctl) { try { ctl.abort(); } catch (e) {} }
+                    const err = new Error(`请求超时（${Math.round(ms / 1000)} 秒没有响应），可能是网络不好或接口太忙，稍后再试`);
+                    err.name = 'TimeoutError';
+                    reject(err);
+                }, ms);
+            });
+            const work = Promise.resolve().then(() => run(ctl ? ctl.signal : undefined));
+            // 超时先到时，被中断的请求随后也会报错；这里接住它，免得冒成「未处理的错误」弹红条
+            work.catch(() => {});
+            return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+        };
+        const AI_TIMEOUT_MS = { chat: 120000, summary: 90000 };
+
+        // opts.timeoutMs：这次请求最多等多久（写长篇读后感时会传更长的）
+        const callAIApi = async (messages, apiType = 'chat', opts = {}) => { /* same code */
             const useSummaryApi = apiType === 'summary' && state.settings.summaryApiModel && state.settings.summaryApiKey;
             let apiUrl = useSummaryApi ? state.settings.summaryApiUrl : state.settings.apiUrl;
             const apiKey = useSummaryApi ? state.settings.summaryApiKey : state.settings.apiKey;
             const apiModel = useSummaryApi ? state.settings.summaryApiModel : state.settings.apiModel;
             if (!apiKey || !apiModel) return { error: `请先在设置中填写${useSummaryApi ? '摘要' : '聊天'} API Key和模型` };
-            apiUrl = apiUrl.replace(/\/$/, '');
+            apiUrl = (apiUrl || '').replace(/\/$/, '');
             let endpoint = `${apiUrl}/chat/completions`;
+            const timeoutMs = opts.timeoutMs || AI_TIMEOUT_MS[apiType] || AI_TIMEOUT_MS.chat;
             try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                    body: JSON.stringify({ model: apiModel, messages: messages, stream: false, temperature: apiType === 'chat' ? 0.95 : 0.6, top_p: apiType === 'chat' ? 0.95 : 0.8 })
+                const data = await withTimeout(timeoutMs, async (signal) => {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                        body: JSON.stringify({ model: apiModel, messages: messages, stream: false, temperature: apiType === 'chat' ? 0.95 : 0.6, top_p: apiType === 'chat' ? 0.95 : 0.8 }),
+                        signal
+                    });
+                    if (!response.ok) {
+                        let errorMessage = `API请求失败: HTTP ${response.status} ${response.statusText}`;
+                        try { const errorBody = await response.json(); errorMessage += `\n详情: ${(errorBody.error && errorBody.error.message) || errorBody.message}`; } catch(e){}
+                        throw new Error(errorMessage);
+                    }
+                    return response.json();
                 });
-                if (!response.ok) {
-                    let errorMessage = `API请求失败: HTTP ${response.status} ${response.statusText}`;
-                    try { const errorBody = await response.json(); errorMessage += `\n详情: ${(errorBody.error && errorBody.error.message) || errorBody.message}`; } catch(e){}
-                    throw new Error(errorMessage);
-                }
-                const data = await response.json();
-                if (!data.choices || data.choices.length === 0 || !(data.choices[0].message && data.choices[0].message.content)) throw new Error('API返回了无效或空的响应');
+                if (!data || !data.choices || data.choices.length === 0 || !(data.choices[0].message && data.choices[0].message.content)) throw new Error('API返回了无效或空的响应');
                 return { content: data.choices[0].message.content };
             } catch (error) {
                 console.error('AI call failed:', error);
@@ -3252,7 +3543,8 @@
                 .filter(m => !m.internal && (m.sender === 'user' || m.sender === 'ai'))
                 .slice(-limit)
                 .map(m => {
-                    let content = m.content.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+                    // 聊天记录里存的是转义过的 HTML，发给 AI 前还原成纯文字（&lt; → <）
+                    let content = htmlToPlain(m.content);
                     // 纯对话模式下，把历史里旧的括号描写也一并清掉，
                     // 否则 AI 会把上文当范例继续模仿输出（…）这种格式
                     if (plain && m.sender === 'ai') content = stripStageDirections(content);
@@ -3499,7 +3791,7 @@
             if (error) { if (!silent) addSystemMessage(`AI响应失败: ${error}`); return; }
             if (aiResponse) {
                 const finalResponse = sanitizeReply(aiResponse.replace(/__PAT_[\w-]+__/g, '').trim());
-                if (!silent) { addMessage('ai', finalResponse, { addToHistory: true }); }
+                if (!silent) { addMessage('ai', escapeHtml(finalResponse), { addToHistory: true }); }
                 if (onComplete) onComplete(finalResponse);
                 if (!silent) { maybeAutoSummarize(); }
             }
@@ -3545,7 +3837,7 @@
                 const charName = state.settings.aiName || '角色';
                 const convo = msgs.map(m => {
                     const who = m.sender === 'user' ? userName : charName;
-                    const clean = m.content.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+                    const clean = htmlToPlain(m.content);
                     return `${who}：${clean}`;
                 }).join('\n');
                 const prompt = `请把下面这段「${userName}」与「${charName}」的对话，浓缩成一段简洁连贯的第三人称"记忆摘要"，记录其中发生的关键事件、双方的情绪与关系变化、达成的约定、以及透露出的重要设定或信息，方便日后回忆。只输出摘要正文本身，不要任何前缀或解释。\n\n对话记录：\n${convo}`;
@@ -3594,24 +3886,97 @@
         };
 
 
+        // 聊天记录分批显示：打开时只画最近的一批，往上翻点按钮再画更早的。
+        // 以前一打开就把全部记录一次画出来，聊得越久打开越慢、切换角色越卡。
+        const CHAT_RENDER_BATCH = 80;
+        // 从 end 往前数 n 条「会显示出来的」消息（书页批注只进记录不显示，不算数），返回起点下标
+        const chatBatchStart = (end, n) => {
+            const h = state.chat.history;
+            let i = end, c = 0;
+            while (i > 0 && c < n) { i--; if (h[i] && !h[i].annotation) c++; }
+            return i;
+        };
+        const renderChatRange = (from, to) => {
+            const h = state.chat.history;
+            for (let i = from; i < to; i++) {
+                const msg = h[i];
+                if (!msg) continue;
+                try {
+                    addMessage(msg.sender, msg.content, { timestamp: msg.timestamp, fromStorage: true, internal: msg.internal, annotation: msg.annotation });
+                } catch (e) { console.warn('[聊天] 有一条消息显示失败，已跳过', e); }
+            }
+        };
+        const updateLoadEarlierBtn = () => {
+            let btn = document.getElementById('chat-load-earlier');
+            const from = state.chat.renderedFrom || 0;
+            let left = 0;
+            for (let i = 0; i < from; i++) { const m = state.chat.history[i]; if (m && !m.annotation) left++; }
+            if (!left) { if (btn) btn.remove(); return; }
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.id = 'chat-load-earlier';
+                btn.type = 'button';
+                btn.style.cssText = 'display:block;margin:6px auto 12px;padding:6px 14px;border:1px solid #ddd;border-radius:14px;background:rgba(255,255,255,0.7);color:var(--secondary-text-color);font-size:12px;cursor:pointer;font-family:inherit;';
+                btn.addEventListener('click', loadEarlierMessages);
+            }
+            btn.textContent = `查看更早的消息（还有 ${left} 条）`;
+            if (dom.messageContainer.firstChild !== btn) dom.messageContainer.insertBefore(btn, dom.messageContainer.firstChild);
+        };
+        const loadEarlierMessages = () => {
+            const end = state.chat.renderedFrom || 0;
+            if (end <= 0) return;
+            const from = chatBatchStart(end, CHAT_RENDER_BATCH);
+            // 先画到一个临时容器里，再整批插到最上面
+            const realContainer = dom.messageContainer;
+            const temp = document.createElement('div');
+            const savedTs = state.chat.lastMessageTimestamp;
+            // 时间分隔线要跟「这批之前的那条」比，才不会每批开头都多冒一个时间
+            let prevTs = 0;
+            for (let i = from - 1; i >= 0; i--) { const m = state.chat.history[i]; if (m && !m.annotation) { prevTs = m.timestamp || 0; break; } }
+            state.chat.lastMessageTimestamp = prevTs;
+            dom.messageContainer = temp;
+            try { renderChatRange(from, end); }
+            finally { dom.messageContainer = realContainer; state.chat.lastMessageTimestamp = savedTs; }
+            state.chat.renderedFrom = from;
+            // 插入后把滚动位置往下补回同样的高度，眼前看的那条消息不会跳走
+            const area = dom.chatArea;
+            const prevH = area.scrollHeight, prevTop = area.scrollTop;
+            const btn = document.getElementById('chat-load-earlier');
+            const anchor = btn ? btn.nextSibling : realContainer.firstChild;
+            const frag = document.createDocumentFragment();
+            while (temp.firstChild) frag.appendChild(temp.firstChild);
+            realContainer.insertBefore(frag, anchor);
+            area.scrollTop = prevTop + (area.scrollHeight - prevH);
+            updateLoadEarlierBtn();
+        };
+
         const loadChatHistory = async () => {
             const cid = state.characters.activeId;
-            const savedChat = cid ? await localforage.getItem('chat_' + cid) : null;
+            let savedChat = cid ? await localforage.getItem('chat_' + cid) : null;
+            // 很早的版本存过 { history: [...] } 这种包了一层的格式
+            if (savedChat && !Array.isArray(savedChat) && Array.isArray(savedChat.history)) savedChat = savedChat.history;
             dom.messageContainer.innerHTML = '';
+            removeTypingIndicator();
             state.chat.history = [];
             state.chat.lastMessageTimestamp = 0;
-            if (savedChat) {
-                try {
-                    state.chat.history = savedChat;
-                    state.chat.history.forEach(msg => addMessage(msg.sender, msg.content, { timestamp: msg.timestamp, fromStorage: true, internal: msg.internal, annotation: msg.annotation }));
-                    dom.chatArea.scrollTop = dom.chatArea.scrollHeight;
-                } catch (e) { state.chat.history = []; if (cid) await localforage.removeItem('chat_' + cid); }
+            state.chat.renderedFrom = 0;
+            if (Array.isArray(savedChat)) {
+                state.chat.history = savedChat;
+                const from = chatBatchStart(savedChat.length, CHAT_RENDER_BATCH);
+                state.chat.renderedFrom = from;
+                // 某条消息显示出错只跳过那一条。以前这里一出错就把整个聊天记录从存储里删掉。
+                renderChatRange(from, savedChat.length);
+                updateLoadEarlierBtn();
+                dom.chatArea.scrollTop = dom.chatArea.scrollHeight;
+            } else if (savedChat != null) {
+                console.warn('[聊天] 存储里的聊天记录格式不对，这次先不显示（原数据没有删除）', savedChat);
             }
         };
         const clearChatHistory = async () => {
             if (confirm('确定要清除当前角色的聊天记录吗？')) {
                 state.chat.history = [];
                 state.chat.lastMessageTimestamp = 0;
+                state.chat.renderedFrom = 0;
                 const cid = state.characters.activeId;
                 if (cid) await localforage.removeItem('chat_' + cid);
                 dom.messageContainer.innerHTML = '';
@@ -3632,42 +3997,156 @@
             return out.length ? out : [''];
         };
 
+        // 把 TXT 的原始字节解码成文字。
+        // mode 'auto'：有 BOM 按 BOM；否则先严格按 UTF-8 解，解不通（出现非法字节）就换 GB18030（GBK 的超集）。
+        // 以前固定按设置里的编码读、默认 GBK，现在大多数 TXT 是 UTF-8，不先去设置里切换就是满屏乱码。
+        const decodeBookBytes = (buf, mode) => {
+            const bytes = new Uint8Array(buf);
+            const dec = (label, fatal) => new TextDecoder(label, fatal ? { fatal: true } : undefined).decode(bytes);
+            if (mode === 'UTF-8' || mode === 'GBK') {
+                return { text: dec(mode === 'GBK' ? 'gb18030' : 'utf-8'), encoding: mode, auto: false };
+            }
+            if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) return { text: dec('utf-8'), encoding: 'UTF-8', auto: true };
+            if (bytes[0] === 0xFF && bytes[1] === 0xFE) return { text: dec('utf-16le'), encoding: 'UTF-16', auto: true };
+            if (bytes[0] === 0xFE && bytes[1] === 0xFF) return { text: dec('utf-16be'), encoding: 'UTF-16', auto: true };
+            try {
+                return { text: dec('utf-8', true), encoding: 'UTF-8', auto: true };
+            } catch (e) {
+                return { text: dec('gb18030'), encoding: 'GBK', auto: true };
+            }
+        };
+        // 解出来的文字里「�」占比很高，基本就是编码不对（或者根本不是文本文件）
+        const looksGarbled = (text) => {
+            const sample = text.length > 200000 ? text.slice(0, 200000) : text;
+            if (!sample.length) return false;
+            let bad = 0;
+            for (let i = 0; i < sample.length; i++) if (sample.charCodeAt(i) === 0xFFFD) bad++;
+            return bad > 20 && bad / sample.length > 0.002;
+        };
+        // 书架上已有同名的书时，给新书换个名字。
+        // 章节摘要和读后感都是按书名存的，同名会串在一起，删掉其中一本还会把另一本的也一起删了。
+        const uniqueBookTitle = (title) => {
+            const taken = new Set(Object.values(state.books).map(b => b.title));
+            if (!taken.has(title)) return title;
+            let n = 2;
+            while (taken.has(`${title} (${n})`)) n++;
+            return `${title} (${n})`;
+        };
+
         const handleFileUpload = (event) => {
             const file = event.target.files[0];
-            if (!file || !file.name.endsWith('.txt')) { addSystemMessage('请上传.txt格式的文件'); return; }
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const bookId = `book-${Date.now()}`;
-                const bookTitle = file.name.replace(/\.txt$/i, '');
-                const newBook = {
-                    id: bookId, title: bookTitle,
-                    paragraphs: normalizeBookText(e.target.result),
-                    toc: [], currentChapter: '', comments: {},
-                    lastScrollTop: 0, lastScrollLeft: 0, lastParaIndex: 0, _loaded: true
-                };
-                state.books[bookId] = newBook;
-                state.activeBookId = bookId;
-                generateTOC();
-
-                // 先把界面显示出来（只渲染首屏窗口，瞬时完成），再在后台落盘，
-                // 避免用户对着白屏等 IndexedDB 写完几 MB 正文。
-                hideBookListModal();
-                await switchView('reader-view');
-                displayBookContent({ anchorPara: 0 });
-                addSystemMessage(`开始阅读《${bookTitle}》`);
-
-                await loadCommentsForActiveBook();
-                await saveBookContent(bookId);
-                await saveBookProgress(bookId);
-                await saveBookIndex();
-                await localforage.setItem('lastActiveBookId', bookId);
-
-                if (state.settings.reading.autoGenerateSummaries) { await generateAllSummaries(bookTitle); }
-                else { confirmSummaryGeneration(bookTitle); }
-            };
-            const encoding = state.settings.reading.bookEncoding || 'GBK';
-            reader.readAsText(file, encoding);
             event.target.value = '';
+            if (!file) return;
+            if (!/\.txt$/i.test(file.name)) { addSystemMessage('请上传.txt格式的文件'); return; }
+            importBookFile(file);
+        };
+
+        // 把一个 TXT 文件导入成一本书并打开。书架上传、从文件管理器「分享」进来都走这里。
+        // opts.askSummary：导完要不要问「生成章节摘要」（一次分享好几本时只问最后一本，免得连弹好几个框）
+        const importBookFile = async (file, opts = {}) => {
+            const askSummary = opts.askSummary !== false;
+            const mode = state.settings.reading.bookEncoding || 'auto';
+
+            let decoded;
+            try {
+                if (typeof TextDecoder === 'function' && typeof file.arrayBuffer === 'function') {
+                    decoded = decodeBookBytes(await file.arrayBuffer(), mode);
+                } else {
+                    // 很老的浏览器没有 TextDecoder，退回原来的读法（自动模式下按 UTF-8）
+                    const text = await new Promise((res, rej) => {
+                        const reader = new FileReader();
+                        reader.onload = () => res(reader.result);
+                        reader.onerror = () => rej(reader.error);
+                        reader.readAsText(file, mode === 'GBK' ? 'GBK' : 'UTF-8');
+                    });
+                    decoded = { text, encoding: mode === 'GBK' ? 'GBK' : 'UTF-8', auto: false };
+                }
+            } catch (err) {
+                console.error(err);
+                addSystemMessage('读不出这个文件：' + ((err && err.message) || err));
+                return false;
+            }
+
+            // 一次分享好几本时会在同一毫秒里连着导，id 后面加个随机数免得撞上
+            const bookId = `book-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            const rawTitle = String(file.name || '').replace(/\.(txt|text)$/i, '').trim() || `分享的书 ${new Date().toLocaleDateString()}`;
+            const bookTitle = uniqueBookTitle(rawTitle);
+            const newBook = {
+                id: bookId, title: bookTitle,
+                paragraphs: normalizeBookText(decoded.text),
+                toc: [], currentChapter: '', comments: {},
+                lastScrollTop: 0, lastScrollLeft: 0, lastParaIndex: 0, _loaded: true
+            };
+            decoded = null;   // 原始全文已经切成段落了，早点放掉
+            state.books[bookId] = newBook;
+            state.activeBookId = bookId;
+            generateTOC();
+
+            // 先把界面显示出来（只渲染首屏窗口，瞬时完成），再在后台落盘，
+            // 避免用户对着白屏等 IndexedDB 写完几 MB 正文。
+            hideBookListModal();
+            await switchView('reader-view');
+            displayBookContent({ anchorPara: 0 });
+            addSystemMessage(`开始阅读《${bookTitle}》`);
+            if (bookTitle !== rawTitle) {
+                addSystemMessage(`书架上已经有《${rawTitle}》了，这本记为《${bookTitle}》，两本的章节摘要和读后感分开存。`, true);
+            }
+            if (looksGarbled(newBook.paragraphs.join('\n'))) {
+                addSystemMessage('这本书看起来有乱码。可以先删掉它，到「设置 → 阅读设置 → 书籍编码」换一个编码再重新导入。', true);
+            }
+
+            await loadCommentsForActiveBook();
+            await saveBookContent(bookId);
+            await saveBookProgress(bookId);
+            await saveBookIndex();
+            await localforage.setItem('lastActiveBookId', bookId);
+
+            if (!askSummary) return true;
+            if (state.settings.reading.autoGenerateSummaries) { await generateAllSummaries(bookTitle); }
+            else { confirmSummaryGeneration(bookTitle); }
+            return true;
+        };
+
+        // ===== 从文件管理器「分享」TXT 进来 =====
+        // 流程：文件管理器里选 TXT → 分享 → 本 App → 浏览器把文件 POST 到 share-target
+        //      → sw.js 接住、存进专用缓存，再把页面打开成「?share=1」→ 这里取出来逐本导入。
+        // 缓存名必须跟 sw.js 里的 SHARE_CACHE 一致。只有装到桌面（安卓 Chrome）后才会出现在分享菜单里。
+        const shareCacheName = () => 'peiban-reader-share|' + location.href.split(/[?#]/)[0].replace(/[^\/]*$/, '');
+        // 返回 true 表示这次是分享进来的（不管最后导没导成）
+        const takeSharedBooks = async () => {
+            if (!/[?&]share=1(&|$)/.test(location.search)) return false;
+            // 先把网址里的 ?share=1 抹掉，免得刷新一下又导一遍
+            try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* 抹不掉也不要紧 */ }
+            if (!('caches' in window)) return true;
+            const name = shareCacheName();
+            const files = [];
+            try {
+                const c = await caches.open(name);
+                const reqs = (await c.keys()).sort((a, b) => (a.url < b.url ? -1 : a.url > b.url ? 1 : 0));
+                for (const r of reqs) {
+                    const res = await c.match(r);
+                    if (!res) continue;
+                    const blob = await res.blob();
+                    let fname = '';
+                    try { fname = decodeURIComponent(res.headers.get('X-File-Name') || ''); } catch (e) { /* 名字坏了就不要了 */ }
+                    files.push(new File([blob], fname, { type: blob.type || 'text/plain' }));
+                }
+            } catch (e) {
+                console.warn('[分享] 读取失败', e);
+            } finally {
+                // 取完就删，不管成没成功，免得下次打开又冒出来
+                try { await caches.delete(name); } catch (e) { /* ignore */ }
+            }
+            if (!files.length) { addSystemMessage('没收到分享过来的文件，再分享一次试试'); return true; }
+            // 分享菜单只收文本文件，但有的文件管理器类型标得不准，再按扩展名 / 类型兜一下
+            const books = files.filter(f => /\.(txt|text)$/i.test(f.name) || /^text\//.test(f.type));
+            files.filter(f => books.indexOf(f) < 0).forEach(f => addSystemMessage(`「${f.name || '未命名文件'}」不是 TXT，跳过了`));
+            let n = 0;
+            for (let i = 0; i < books.length; i++) {
+                if (await importBookFile(books[i], { askSummary: i === books.length - 1 })) n++;
+            }
+            if (n > 1) addSystemMessage(`收到 ${n} 本书，都放到书架上了，现在打开的是最后一本`, true);
+            return true;
         };
         
         const loadBook = async (bookId) => {
@@ -3685,12 +4164,19 @@
             if (!state.books[bookId]) return;
             const bookTitle = state.books[bookId].title;
             if (confirm(`确定要删除《${bookTitle}》吗？`)) {
-                delete state.summaries[bookTitle];
-                // 连同这本书的读后感一起清理，避免留下无书可依的孤儿数据
-                if (state.reflections && state.reflections[bookTitle]) delete state.reflections[bookTitle];
+                // 摘要和读后感是按书名存的。以前书架上可能已经有两本同名的书（新版导入时会自动改名，旧数据里还可能有），
+                // 那样删一本会把另一本的摘要和读后感也一起删掉，所以还有同名的书在时先留着。
+                const sameTitleLeft = Object.values(state.books).some(b => b.id !== bookId && b.title === bookTitle);
+                if (!sameTitleLeft) {
+                    delete state.summaries[bookTitle];
+                    // 连同这本书的读后感一起清理，避免留下无书可依的孤儿数据
+                    if (state.reflections && state.reflections[bookTitle]) delete state.reflections[bookTitle];
+                }
                 delete state.books[bookId];
                 await localforage.removeItem('book_' + bookId);
                 await localforage.removeItem('bookprog_' + bookId);
+                await localforage.removeItem(bookmarksKey(bookId));
+                delete bookmarkCache[bookId];
                 // 删除该书在所有角色下的批注
                 (state.characters.list || []).forEach(async c => { await localforage.removeItem(`comments_${c.id}_${bookId}`); });
                 if (state.activeBookId === bookId) {
@@ -3781,15 +4267,59 @@
             pElement.appendChild(icon);
         };
 
+        // ===== 章节标题识别 =====
+        // 以前只认「第X章/回/节/卷/部」和「Chapter N」：
+        //   - 漏掉 序章、楔子、番外、尾声 这类，也漏掉全角数字的「第１章」和「001 标题」式的目录；
+        //   - 又会把「第一回合，他输了。」「第三节课下课后」这种正文短句当成章节。
+        const TOC_NUM = '[0-9０-９一二三四五六七八九十百千万零〇两壹贰叁肆伍陆柒捌玖拾佰仟]';
+        const TOC_RE_NTH = new RegExp(`^第\\s*${TOC_NUM}+\\s*[章回节卷部集篇幕](.*)$`);
+        // 「第X回」后面紧跟这些字时是普通词语（回合、节课、集团、部队、部门），不是标题
+        const TOC_NOT_TITLE_NEXT = /^(合|课|团|队|门)/;
+        const TOC_RE_SPECIAL = /^(序章|序言|序幕|序|楔子|引子|引言|前言|开篇|番外篇?|尾声|后记|终章|大结局|完本感言|结语)(.*)$/;
+        // 特殊标题后面只能是：什么都没有、空白、标点、编号（如「番外一」「序：」），免得「后记得」「序列」「前言不搭后语」被误认
+        const TOC_SPECIAL_NEXT = /^($|[\s:：、.．·\-—_（(【\[《「“0-9０-９一二三四五六七八九十篇之])/;
+        const TOC_RE_EN = /^(chapter|part|book)\s+(\d+|[ivxlcdm]+)\b|^(prologue|epilogue|preface|afterword)\b/i;
+        // 「001 标题」「12、标题」「3. 标题」或单独一个编号。只在全书找不到上面那些标题时才用，避免把正文里的编号列表当章节
+        const TOC_RE_NUMBERED = /^[0-9０-９]{1,4}(?:\s*[、.．:：]\s*|\s+)(\S.*)$|^[0-9０-９]{1,4}$/;
+
+        // 像不像正文里的一句话：带句号、或以逗号顿号分号结尾的，基本不是标题
+        const tocLooksLikeSentence = (line) => /。/.test(line) || /[，,；;、]$/.test(line);
+        const isChapterTitle = (line) => {
+            if (!line || line.length > 40 || tocLooksLikeSentence(line)) return false;
+            const m = line.match(TOC_RE_NTH);
+            if (m) return !TOC_NOT_TITLE_NEXT.test(m[1]);
+            if (line.length <= 30) {
+                const s = line.match(TOC_RE_SPECIAL);
+                if (s && (s[1].indexOf('番外') === 0 || TOC_SPECIAL_NEXT.test(s[2]))) return true;
+            }
+            return TOC_RE_EN.test(line);
+        };
+        const isNumberedTitle = (line) => {
+            if (!line || line.length > 30 || tocLooksLikeSentence(line)) return false;
+            const m = line.match(TOC_RE_NUMBERED);
+            if (!m) return false;
+            // 「2023 年」「3 个人」这种是正文里的数字，不是编号
+            return !(m[1] && /^[年月日号时点分秒岁个元次位名件条%]/.test(m[1]));
+        };
+
         const generateTOC = () => { /* same code */
             const activeBook = getActiveBook();
             if (!activeBook || activeBook.paragraphs.length === 0) return;
             activeBook.toc = [];
-            const chapterRegex = /^(第\s*[一二三四五六七八九十百千万零〇\d]+\s*[章回节卷部])|^(Chapter\s*\d+)/im;
-            activeBook.paragraphs.forEach((paraText, index) => {
-                const trimmedLine = paraText.trim();
-                if (chapterRegex.test(trimmedLine) && trimmedLine.length < 30) { activeBook.toc.push({ title: trimmedLine, paraIndex: index }); }
-            });
+            const paras = activeBook.paragraphs;
+            for (let index = 0; index < paras.length; index++) {
+                const trimmedLine = (paras[index] || '').trim();
+                if (isChapterTitle(trimmedLine)) activeBook.toc.push({ title: trimmedLine, paraIndex: index });
+            }
+            // 几乎没有「第X章」式标题的书，再试试「001 标题」这种纯编号目录（至少找到 3 个才算数）
+            if (activeBook.toc.length < 3) {
+                const numbered = [];
+                for (let index = 0; index < paras.length; index++) {
+                    const trimmedLine = (paras[index] || '').trim();
+                    if (isChapterTitle(trimmedLine) || isNumberedTitle(trimmedLine)) numbered.push({ title: trimmedLine, paraIndex: index });
+                }
+                if (numbered.length >= 3) activeBook.toc = numbered;
+            }
             if (activeBook.toc.length === 0 && activeBook.paragraphs.length > 0) { activeBook.toc.push({ title: '书籍开头', paraIndex: 0 }); }
         };
         const renderTOC = () => { /* same code */
@@ -3803,7 +4333,145 @@
                 dom.tocList.appendChild(li);
             });
         };
-        const toggleTOC = (show) => { dom.tocPanel.classList.toggle('show', show); dom.tocOverlay.classList.toggle('show', show); };
+        // tab：打开时显示哪一页（'toc' 目录 | 'bookmarks' 书签），默认目录
+        const toggleTOC = (show, tab) => {
+            dom.tocPanel.classList.toggle('show', show);
+            dom.tocOverlay.classList.toggle('show', show);
+            if (show) setTocTab(tab || 'toc');
+        };
+
+        // ===== 书签 =====
+        // 每本书一份，存在 bookmarks_<书的 id> 里。不分角色：书签是你自己的，换了陪读角色也还在。
+        // 导出备份时会自动带上（备份是全量的）。
+        const bookmarkCache = {};
+        const bookmarksKey = (bookId) => 'bookmarks_' + bookId;
+        const getBookmarks = async (bookId) => {
+            if (!bookId) return [];
+            if (!bookmarkCache[bookId]) {
+                let list = null;
+                try { list = await localforage.getItem(bookmarksKey(bookId)); } catch (e) { /* 读不到就当没有 */ }
+                bookmarkCache[bookId] = Array.isArray(list) ? list : [];
+            }
+            return bookmarkCache[bookId];
+        };
+        const saveBookmarks = (bookId) => localforage.setItem(bookmarksKey(bookId), bookmarkCache[bookId] || []);
+
+        // 一闪而过的小提示（加书签这种操作用不着往聊天里发消息）
+        const flashTip = (text) => {
+            let el = document.getElementById('flash-tip');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'flash-tip';
+                el.style.cssText = 'position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:10002;'
+                    + 'background:rgba(0,0,0,0.78);color:#fff;font-size:14px;padding:9px 18px;border-radius:18px;'
+                    + 'pointer-events:none;opacity:0;transition:opacity .2s;max-width:80vw;text-align:center;';
+                document.body.appendChild(el);
+            }
+            el.textContent = text;
+            el.style.opacity = '1';
+            clearTimeout(el._t);
+            el._t = setTimeout(() => { el.style.opacity = '0'; }, 1400);
+        };
+
+        // 导航面板上的书签按钮：当前所在段落有书签就显示成实心的「已加书签」
+        const BM_PATH_OUTLINE = 'M17,3H7A2,2 0 0,0 5,5V21L12,18L19,21V5C19,3.89 18.1,3 17,3M17,18L12,15.82L7,18V5H17V18Z';
+        const BM_PATH_FILLED = 'M17,3H7A2,2 0 0,0 5,5V21L12,18L19,21V5C19,3.89 18.1,3 17,3Z';
+        const refreshBookmarkBtn = async () => {
+            const btn = document.getElementById('rnav-bookmark-btn');
+            if (!btn) return;
+            const book = getActiveBook();
+            const list = book ? await getBookmarks(book.id) : [];
+            const para = state.reading.curPara || 0;
+            const has = list.some(b => b.para === para);
+            btn.classList.toggle('on', has);
+            const label = btn.querySelector('.bm-label');
+            if (label) label.textContent = has ? '已加书签' : '加书签';
+            const path = btn.querySelector('.bm-icon-path');
+            if (path) path.setAttribute('d', has ? BM_PATH_FILLED : BM_PATH_OUTLINE);
+        };
+
+        // 在当前位置加书签；这里已经有了就取消
+        const toggleBookmarkHere = async () => {
+            const book = getActiveBook();
+            if (!book) return;
+            const list = await getBookmarks(book.id);
+            const para = state.reading.curPara || 0;
+            const i = list.findIndex(b => b.para === para);
+            let tip;
+            if (i >= 0) {
+                list.splice(i, 1);
+                tip = '已取消这个书签';
+            } else {
+                const toc = book.toc || [];
+                const ci = findChapterIndexByPara(toc, para);
+                list.push({
+                    id: `bm-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                    para,
+                    offset: getCurParaOffset(),   // 段内位置：长段落里也能回到原处
+                    chapter: (ci >= 0 && toc[ci]) ? toc[ci].title : '',
+                    text: String((book.paragraphs || [])[para] || '').trim().slice(0, 60),
+                    at: Date.now(),
+                });
+                list.sort((a, b) => a.para - b.para || a.at - b.at);
+                tip = '已加书签';
+            }
+            try { await saveBookmarks(book.id); flashTip(tip); }
+            catch (e) { console.warn('[书签] 保存失败', e); flashTip('书签没保存成功，再试一次'); }
+            refreshBookmarkBtn();
+            renderBookmarkList();
+        };
+
+        const renderBookmarkList = async () => {
+            const ul = document.getElementById('bookmark-list');
+            if (!ul) return;
+            const book = getActiveBook();
+            const list = book ? await getBookmarks(book.id) : [];
+            if (getActiveBook() !== book) return;   // 等着读的时候换了书
+            ul.innerHTML = '';
+            if (!list.length) {
+                const li = document.createElement('li');
+                li.className = 'bm-empty';
+                li.textContent = book
+                    ? '还没有书签。读到想记住的地方，点屏幕中间呼出面板，按「加书签」就行。'
+                    : '请先打开一本书。';
+                ul.appendChild(li);
+                return;
+            }
+            const fmt = (t) => { const d = new Date(t); return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+            list.forEach(b => {
+                const li = document.createElement('li');
+                li.className = 'bm-item';
+                li.dataset.bmId = b.id;
+                const main = document.createElement('div');
+                main.className = 'bm-main';
+                const title = document.createElement('div');
+                title.className = 'bm-title';
+                title.textContent = b.chapter || '书籍开头';
+                const text = document.createElement('div');
+                text.className = 'bm-text';
+                text.textContent = b.text || '（空段落）';
+                const time = document.createElement('div');
+                time.className = 'bm-time';
+                time.textContent = fmt(b.at);
+                main.appendChild(title); main.appendChild(text); main.appendChild(time);
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'bm-del';
+                del.title = '删除书签';
+                del.textContent = '×';
+                li.appendChild(main); li.appendChild(del);
+                ul.appendChild(li);
+            });
+        };
+
+        const setTocTab = (tab) => {
+            const isBm = tab === 'bookmarks';
+            document.querySelectorAll('.toc-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === (isBm ? 'bookmarks' : 'toc')));
+            dom.tocList.style.display = isBm ? 'none' : '';
+            const ul = document.getElementById('bookmark-list');
+            if (ul) ul.style.display = isBm ? '' : 'none';
+            if (isBm) renderBookmarkList();
+        };
 
         window.handleAvatarClick = (sender) => { /* same code */
             let patter, patted, suffixes, command;
@@ -3971,6 +4639,17 @@
             }
         };
 
+        // 随读随评能不能触发。以前没有任何条件：没配接口也照样请求，聊天里会一条条刷「AI评论失败」；
+        // 上一条还没回来就又发下一条；正在「点评本章」时也会插进来抢接口。
+        const canAutoComment = () => {
+            const comp = state.settings.companion || {};
+            if (comp.autoCommentEnabled === false) return false;
+            if (!state.settings.apiKey || !state.settings.apiModel) return false;
+            if (state.reading.commentingChapter || state.reading.autoCommentBusy) return false;
+            if (navigator.onLine === false) return false;
+            return true;
+        };
+
         const handleReaderScroll = () => {
             hideSelectionMenu();
             const activeBook = getActiveBook();
@@ -3991,7 +4670,7 @@
                     state.reading.lastScrollTop = scrollTop;
                     if (isScrollingDown) {
                         const now = Date.now();
-                        if (now - state.reading.lastCommentTime > 20000 && Math.random() < 0.25) { triggerAIReadComment(); }
+                        if (canAutoComment() && now - state.reading.lastCommentTime > 20000 && Math.random() < 0.25) { triggerAIReadComment(); }
                         if (now - state.reading.lastPatTime > 30000 && Math.random() < 0.20) { triggerAIPat(); }
                     }
                 } else {
@@ -4042,19 +4721,21 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             };
             const messages = [systemPrompt, ...recentHistory, { role: 'user', content: contextMessage }];
 
+            // 返回 false 表示这一条失败了，「点评本章」据此判断要不要停下
             return callAIApi(messages, 'chat').then(async ({ content: aiResponse, error }) => {
                  if (error) {
                     addSystemMessage(`AI评论失败: ${error}`);
                     if(thinkingIcon) { removeHighlight(thinkingIcon.dataset.highlightId); thinkingIcon.remove(); }
-                    return;
+                    return false;
                 }
                 if (aiResponse) {
                     const finalResponse = sanitizeReply(aiResponse.replace(/__PAT_[\w-]+__/g, '').trim());
                     const commentData = { text: finalResponse, type: 'ai', highlightId: thinkingIcon.dataset.highlightId, quote: quote };
-                    const content = `<div class="quote">${quote}</div>${finalResponse}`;
+                    const content = `<div class="quote">${escapeHtml(quote)}</div>${escapeHtml(finalResponse)}`;
                     addMessage('ai', content, { addToHistory: true, annotation: true });
                     await fillCommentPlaceholder(pElement, thinkingIcon, commentData);
                 }
+                return true;
             });
         };
 
@@ -4152,12 +4833,24 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             state.reading.commentingChapter = true;
             if (dom.readerCommentBtn) { dom.readerCommentBtn.disabled = true; dom.readerCommentBtn.style.opacity = '0.5'; }
             addSystemMessage(`伴侣正在细读本章，准备写下 ${targets.length} 处感想…`, true);
+            setAppBusy(true);   // 逐段点评期间别让新版本自动刷新页面打断
             try {
+                let failStreak = 0;
                 for (const target of targets) {
                     state.reading.lastCommentTime = Date.now();
-                    await commentOnParagraph(target); // 逐段顺序生成，避免并发与限流
+                    const ok = await commentOnParagraph(target); // 逐段顺序生成，避免并发与限流
+                    // 接口挂了 / 超时 / Key 失效时，接着跑只会一条条刷失败，连续两处失败就先停下
+                    if (ok === false) {
+                        if (++failStreak >= 2) {
+                            addSystemMessage('连续两处都没写成，先停下了。检查一下网络或接口设置，再点一次「点评本章」就能接着来。', true);
+                            break;
+                        }
+                    } else {
+                        failStreak = 0;
+                    }
                 }
             } finally {
+                setAppBusy(false);
                 state.reading.commentingChapter = false;
                 if (dom.readerCommentBtn) { dom.readerCommentBtn.disabled = false; dom.readerCommentBtn.style.opacity = ''; }
             }
@@ -4182,7 +4875,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 replyBtn.addEventListener('click', () => {
                     dismiss();
                     switchView('chat-view');
-                    addMessage('ai', text, { addToHistory: true });
+                    addMessage('ai', escapeHtml(text), { addToHistory: true });
                     dom.messageInput.focus();
                 });
                 dom.readerBubbleActions.appendChild(replyBtn);
@@ -4223,7 +4916,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                     state.reading.companionBusy = true;
                     generateCompanionLine(
                         `（旁白提示：${state.settings.userName || '对方'}已经连续读了挺久的书了，你有点心疼，用你的语气很自然地关心一句，提醒 TA 歇一歇眼睛、喝口水或活动一下，一两句就好，别啰嗦、别说教，也不要提到"旁白""系统"这些词。）`,
-                        (reply) => { state.reading.companionBusy = false; showReaderBubble(reply, { reply: true }); addMessage('ai', reply, { addToHistory: true }); }
+                        (reply) => { state.reading.companionBusy = false; showReaderBubble(reply, { reply: true }); addMessage('ai', escapeHtml(reply), { addToHistory: true }); }
                     );
                     setTimeout(() => { state.reading.companionBusy = false; }, 20000);
                 }
@@ -4328,13 +5021,16 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 voice_setting: voiceSetting,
                 audio_setting: { sample_rate: 32000, bitrate: 128000, format: 'mp3', channel: 1 },
             };
-            const resp = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
-                body: JSON.stringify(body),
+            const data = await withTimeout(60000, async (signal) => {
+                const resp = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+                    body: JSON.stringify(body),
+                    signal,
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+                return resp.json();
             });
-            if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
-            const data = await resp.json();
             if (data.base_resp && data.base_resp.status_code !== 0) throw new Error(data.base_resp.status_msg || '合成失败');
             const hex = data.data && data.data.audio;
             if (!hex) throw new Error('返回中没有音频数据');
@@ -4976,11 +5672,12 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             dom.rfResultMeta.textContent = `${charName} · ${scope.label} · 目标 ${words} 字`;
             dom.rfResultText.textContent = `${charName} 正在写，长一点的文字可能要等十几秒到一分钟……`;
             try { dom.rfResult.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+            setAppBusy(true);   // 写的这一两分钟里别让新版本自动刷新页面，否则这篇白写
             try {
                 const { content, error } = await callAIApi([
                     { role: 'system', content: system },
                     { role: 'user', content: userParts.join('\n\n') },
-                ], 'chat');
+                ], 'chat', { timeoutMs: Math.min(300000, 90000 + words * 40) });   // 字数越多等得越久，最长 5 分钟
                 if (error) { dom.rfResultText.textContent = '写失败了：' + error; return; }
                 const text = (content || '').trim();
                 if (!text) { dom.rfResultText.textContent = '没有拿到内容，再试一次吧。'; return; }
@@ -5002,6 +5699,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 state.reflections[book.title].unshift(entry);
                 await saveReflections();
             } finally {
+                setAppBusy(false);
                 btn.disabled = false; btn.textContent = origText;
             }
         };
@@ -5257,6 +5955,13 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 const numSentencesToPick = Math.floor(Math.random() * 3) + 1;
                 const startSentenceIndex = Math.floor(Math.random() * (sentences.length - numSentencesToPick + 1));
                 const quote = sentences.slice(startSentenceIndex, startSentenceIndex + numSentencesToPick).join('').trim();
+                // 一次只跑一条：上一条没回来之前不再触发新的（见 canAutoComment）
+                const run = (q) => {
+                    state.reading.autoCommentBusy = true;
+                    Promise.resolve(getCommentOnQuote(q, targetPara))
+                        .catch(() => {})
+                        .then(() => { state.reading.autoCommentBusy = false; });
+                };
                 if (quote) {
                     const range = document.createRange();
                     const textNode = Array.from(targetPara.childNodes).find(node => node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SPAN'));
@@ -5267,11 +5972,11 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                             range.setStart(innerTextNode, startIndex);
                             range.setEnd(innerTextNode, startIndex + quote.length);
                             state.selection.range = range;
-                            getCommentOnQuote(quote, targetPara);
+                            run(quote);
                         }
                     } else {
                         state.selection.range = null;
-                        getCommentOnQuote(text, targetPara);
+                        run(text);
                     }
                 }
             }
@@ -5446,7 +6151,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             else if (mode === 'whatNext') msg = `先别剧透后面的剧情哈，就凭现在读到的，你猜接下来大概会怎么发展？我说的是这段："${quote}"`;
             else msg = `"${quote}"`;
             switchView('chat-view'); // 切到聊天界面看伴侣的回应
-            addMessage('user', msg, { addToHistory: true });
+            addMessage('user', escapeHtml(msg), { addToHistory: true });
             getChatResponse({ userMessage: msg });
         };
 
@@ -5487,7 +6192,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 const thinkingIcon = addCommentPlaceholder(firstP, 'user', true);
                 const commentData = { text: commentText, type: 'user', highlightId: thinkingIcon.dataset.highlightId, quote: state.selection.text };
                 fillCommentPlaceholder(firstP, thinkingIcon, commentData);
-                const userMessageContent = `<div class="quote">${state.selection.text}</div>${commentText}`;
+                const userMessageContent = `<div class="quote">${escapeHtml(state.selection.text)}</div>${escapeHtml(commentText)}`;
                 addMessage('user', userMessageContent, { addToHistory: true });
                 getChatResponse({ userMessage: `我刚刚评论："${commentText}"。` });
             }
@@ -5504,78 +6209,158 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 const summaryText = bookSummaries[chapter.title] || '';
                 const item = document.createElement('div');
                 item.className = 'summary-item';
-                item.innerHTML = `<label>${chapter.title} <button class="ai-gen-btn" data-chapter-title="${chapter.title}" data-para-index="${chapter.paraIndex}">AI生成</button></label><textarea data-chapter-title="${chapter.title}" placeholder="输入本章摘要...">${summaryText}</textarea>`;
+                // 章节名来自 TXT 原文、摘要来自 AI，都要转义：以前一行「第1章<img src=x onerror=…>」就能执行代码
+                const t = escapeHtml(chapter.title);
+                item.innerHTML = `<label>${t} <button class="ai-gen-btn" data-chapter-title="${t}" data-para-index="${chapter.paraIndex}">AI生成</button></label><textarea data-chapter-title="${t}" placeholder="输入本章摘要...">${escapeHtml(summaryText)}</textarea>`;
                 dom.summaryList.appendChild(item);
             });
+            // 记下面板上显示的是哪本书：别的地方（批量生成、保存）据此判断能不能动面板上的内容
+            dom.summaryList.dataset.bookId = activeBook.id;
             dom.autoSummaryToggle.checked = state.settings.reading.autoGenerateSummaries;
             dom.summaryModal.classList.add('show');
         };
         const hideSummaryModal = () => dom.summaryModal.classList.remove('show');
+        const persistSummaries = () => localforage.setItem('readingCompanionSummaries', state.summaries);
         const saveSummaries = async (bookTitle) => { /* same code */
             const activeBook = getActiveBook();
             const title = bookTitle || (activeBook ? activeBook.title : null);
             if (!title) return;
             const textareas = dom.summaryList.querySelectorAll('textarea');
-            if (textareas.length > 0) {
+            // 面板上显示的必须正是这本书，才把输入框里的内容收进来。
+            // 以前不判断：面板上留着上一本书的内容时，会把那本的摘要整个写进这本名下。
+            const listBook = state.books[dom.summaryList.dataset.bookId];
+            if (textareas.length > 0 && listBook && listBook.title === title) {
                 if (!state.summaries[title]) state.summaries[title] = {};
                 textareas.forEach(textarea => { const chapterTitle = textarea.dataset.chapterTitle; state.summaries[title][chapterTitle] = textarea.value.trim(); });
             }
-            await localforage.setItem('readingCompanionSummaries', state.summaries);
+            await persistSummaries();
             if (!bookTitle) { addSystemMessage('章节摘要已保存'); hideSummaryModal(); }
         };
         const loadSummaries = async () => { /* same code */
             const saved = await localforage.getItem('readingCompanionSummaries');
             if (saved) { try { state.summaries = saved; } catch (e) { state.summaries = {}; } }
         };
+
+        // 批量生成摘要的任务状态：同一时间只跑一个，可以中途停止
+        const summaryJob = { running: false, stop: false, bookTitle: '' };
+
         const updateSummaryProgress = (status, message) => { /* same code */
             const modal = dom.summaryProgressModal;
+            const stopBtn = document.getElementById('summary-progress-stop');
+            if (stopBtn) {
+                stopBtn.style.display = (status === 'start' || status === 'progress') ? '' : 'none';
+                if (status === 'start') { stopBtn.disabled = false; stopBtn.textContent = '停止'; }
+            }
             if (status === 'start') { modal.classList.remove('collapsed'); dom.summaryProgressTitle.textContent = '生成摘要'; dom.summaryProgressContent.textContent = message; modal.classList.add('show'); } 
             else if (status === 'progress') { dom.summaryProgressContent.textContent = message; } 
-            else if (status === 'done' || status === 'error') { dom.summaryProgressTitle.textContent = status === 'done' ? '生成完毕' : '出现错误'; dom.summaryProgressContent.textContent = message; setTimeout(() => { modal.classList.remove('show'); }, 4000); } 
+            else if (status === 'done' || status === 'error' || status === 'stopped') {
+                dom.summaryProgressTitle.textContent = status === 'done' ? '生成完毕' : (status === 'stopped' ? '已停止' : '出现错误');
+                dom.summaryProgressContent.textContent = message;
+                // 结果多留一会儿让人看清；期间又开了新任务就别把它的进度框收掉
+                setTimeout(() => { if (!summaryJob.running) modal.classList.remove('show'); }, status === 'done' ? 4000 : 10000);
+            } 
             else if (status === 'hide') { modal.classList.remove('show'); }
         };
-        const generateSummaryForChapter = async (chapterTitle, paraIndex) => { /* same code */
-            const activeBook = getActiveBook();
+        // 生成摘要时每章最多给 AI 看多少字。以前只截前 3000 字，网文一章常有三五千字，后半章（往往是最关键的转折）根本进不去。
+        const SUMMARY_CHAPTER_CHARS = 6000;
+        // 章节不长就整章给；太长就从开头、中间、结尾各取一段（4:3:3），尽量在换行处切，保证整章的来龙去脉都在
+        const sampleChapterText = (text, limit) => {
+            if (text.length <= limit) return { text, sampled: false };
+            const GAP = '\n……（中间略）……\n';
+            const budget = limit - GAP.length * 2;
+            const headLen = Math.floor(budget * 0.4), midLen = Math.floor(budget * 0.3), tailLen = budget - headLen - midLen;
+            // 从 from 开始往后找最近的换行，找不到（或太远）就原地切
+            const snapForward = (from, maxShift) => {
+                const i = text.indexOf('\n', from);
+                return (i !== -1 && i - from <= maxShift) ? i + 1 : from;
+            };
+            let head = text.slice(0, headLen);
+            const lastNl = head.lastIndexOf('\n');
+            if (lastNl > headLen * 0.6) head = head.slice(0, lastNl);
+            const midFrom = snapForward(Math.floor(text.length / 2 - midLen / 2), 200);
+            const tailFrom = snapForward(text.length - tailLen, 200);
+            return { text: head + GAP + text.slice(midFrom, midFrom + midLen) + GAP + text.slice(tailFrom), sampled: true };
+        };
+        // bookArg：批量生成时锁定的那本书；不传就用当前打开的书（摘要面板上的单章「AI生成」）
+        const generateSummaryForChapter = async (chapterTitle, paraIndex, bookArg) => { /* same code */
+            const activeBook = bookArg || getActiveBook();
             if (!activeBook) return { success: false, error: "No active book." };
             const bookTitle = activeBook.title;
-            const btn = dom.summaryList.querySelector(`.ai-gen-btn[data-chapter-title="${chapterTitle}"]`);
+            // 只有摘要面板正显示这本书时才去动面板上的按钮 / 输入框。
+            // 不用拼选择器：章节名里有引号等符号时 querySelector 会直接报错
+            const listShowsBook = dom.summaryList.dataset.bookId === activeBook.id;
+            const findEl = (sel) => listShowsBook
+                ? Array.from(dom.summaryList.querySelectorAll(sel)).find(el => el.dataset.chapterTitle === chapterTitle)
+                : null;
+            const btn = findEl('.ai-gen-btn');
             if (btn) { btn.textContent = '生成中...'; btn.disabled = true; }
             const nextChapter = activeBook.toc.find(c => c.paraIndex > paraIndex);
             const endParaIndex = nextChapter ? nextChapter.paraIndex : activeBook.paragraphs.length;
-            const chapterText = activeBook.paragraphs.slice(paraIndex, endParaIndex).join('\n').substring(0, 3000);
-            const userMessage = `请为以下书籍《${bookTitle}》中"${chapterTitle}"章节的内容，生成一个50字以内的精简摘要：\n\n${chapterText}`;
+            const { text: chapterText, sampled } = sampleChapterText(activeBook.paragraphs.slice(paraIndex, endParaIndex).join('\n'), SUMMARY_CHAPTER_CHARS);
+            const userMessage = `请为以下书籍《${bookTitle}》中"${chapterTitle}"章节的内容，生成一个50字以内的精简摘要：`
+                + (sampled ? '（这一章比较长，下面是从开头、中间、结尾各取的一段，请照顾到整章的发展，尤其是结尾发生了什么）' : '')
+                + `\n\n${chapterText}`;
             const { content: summary, error } = await callAIApi([{ role: 'system', content: '你是一个擅长文本摘要的助手。' }, { role: 'user', content: userMessage }], 'summary');
-            if (error) { if (btn) { btn.textContent = 'AI生成'; btn.disabled = false; } return { success: false, error }; }
+            if (btn) { btn.textContent = 'AI生成'; btn.disabled = false; }
+            if (error) return { success: false, error };
+            // 等结果的这段时间里书被删了，就别再把摘要写回去
+            if (!state.books[activeBook.id]) return { success: false, error: '这本书已被删除' };
             if (summary) {
-                const textarea = dom.summaryList.querySelector(`textarea[data-chapter-title="${chapterTitle}"]`);
+                const textarea = findEl('textarea');
                 if (textarea) textarea.value = summary;
                 if (!state.summaries[bookTitle]) state.summaries[bookTitle] = {};
                 state.summaries[bookTitle][chapterTitle] = summary;
+                // 生成一章就存一章：批量跑到一半关掉页面 / 断网，已经花钱生成的也不会丢
+                try { await persistSummaries(); } catch (e) { console.warn('[摘要] 保存失败', e); }
             }
-            if (btn) { btn.textContent = 'AI生成'; btn.disabled = false; }
             return { success: true };
         };
         const generateAllSummaries = async (bookTitle) => { /* same code */
-            const activeBook = getActiveBook();
-            if (!activeBook || !activeBook.toc || activeBook.toc.length === 0) return;
-            const chaptersToGenerate = activeBook.toc.filter(chapter => { const bookSummaries = state.summaries[bookTitle] || {}; return !bookSummaries[chapter.title]; });
-            if (chaptersToGenerate.length === 0) { addSystemMessage(`《${bookTitle}》的章节摘要已存在，无需生成。`); return; }
-            // 长篇动辄几百上千章，逐章调用接口会持续很久且可能被限流，先让用户确认
-            if (chaptersToGenerate.length > 30 &&
-                !confirm(`《${bookTitle}》有 ${chaptersToGenerate.length} 章需要生成摘要，会逐章请求 AI，耗时较长且可能产生较多费用。确定继续吗？\n\n（也可以之后在「更多 → 章节摘要」里按需单章生成）`)) {
+            if (summaryJob.running) {
+                addSystemMessage(`正在为《${summaryJob.bookTitle}》生成摘要，等它跑完，或点进度框里的「停止」后再开始新的。`, true);
                 return;
             }
-            updateSummaryProgress('start', `准备为《${bookTitle}》生成摘要...`);
-            let successCount = 0; let firstError = null;
-            for (let i = 0; i < chaptersToGenerate.length; i++) {
-                const chapter = chaptersToGenerate[i];
-                updateSummaryProgress('progress', `正在生成 (${i + 1}/${chaptersToGenerate.length}): ${chapter.title}`);
-                const { success, error } = await generateSummaryForChapter(chapter.title, chapter.paraIndex);
-                if (success) { successCount++; } else if (!firstError) { firstError = error; }
+            // 锁定开始时的这本书：中途切到别的书，剩下的章节也照样用这本的正文、记在这本名下
+            const book = getActiveBook();
+            if (!book || !book.toc || book.toc.length === 0) return;
+            const title = book.title;
+            const chaptersToGenerate = book.toc.filter(chapter => { const bookSummaries = state.summaries[title] || {}; return !bookSummaries[chapter.title]; });
+            if (chaptersToGenerate.length === 0) { addSystemMessage(`《${title}》的章节摘要已存在，无需生成。`); return; }
+            // 长篇动辄几百上千章，逐章调用接口会持续很久且可能被限流，先让用户确认
+            if (chaptersToGenerate.length > 30 &&
+                !confirm(`《${title}》有 ${chaptersToGenerate.length} 章需要生成摘要，会逐章请求 AI，耗时较长且可能产生较多费用。确定继续吗？\n\n（生成一章存一章，中途可以随时停止，下次接着来；也可以之后在「更多 → 章节摘要」里按需单章生成）`)) {
+                return;
             }
-            if (successCount > 0) { await saveSummaries(bookTitle); }
-            if (firstError) { updateSummaryProgress('error', `任务完成，但有失败。成功 ${successCount}/${chaptersToGenerate.length}。错误: ${firstError}`); } 
-            else { updateSummaryProgress('done', `所有摘要已成功生成！(${successCount}/${chaptersToGenerate.length})`); }
+            summaryJob.running = true; summaryJob.stop = false; summaryJob.bookTitle = title;
+            setAppBusy(true);
+            updateSummaryProgress('start', `准备为《${title}》生成摘要...`);
+            let successCount = 0, firstError = null, lastError = null, failStreak = 0, endReason = '';
+            try {
+                for (let i = 0; i < chaptersToGenerate.length; i++) {
+                    if (summaryJob.stop) { endReason = 'stopped'; break; }
+                    if (!state.books[book.id]) { endReason = 'deleted'; break; }
+                    const chapter = chaptersToGenerate[i];
+                    updateSummaryProgress('progress', `正在生成 (${i + 1}/${chaptersToGenerate.length}): ${chapter.title}`);
+                    const { success, error } = await generateSummaryForChapter(chapter.title, chapter.paraIndex, book);
+                    if (success) { successCount++; failStreak = 0; }
+                    else {
+                        if (!firstError) firstError = error;
+                        lastError = error;
+                        // 接口挂了 / Key 失效 / 被限流时，接着跑只会一章章白失败，先停下
+                        if (++failStreak >= 3) { endReason = 'failing'; break; }
+                    }
+                }
+            } finally {
+                summaryJob.running = false; summaryJob.stop = false;
+                setAppBusy(false);
+            }
+            const left = chaptersToGenerate.length - successCount;
+            const resumeTip = '已生成的都存好了，下次再点「一键生成」会从还没生成的章节接着来。';
+            if (endReason === 'stopped') updateSummaryProgress('stopped', `已停止。这次生成了 ${successCount} 章，还剩 ${left} 章。${resumeTip}`);
+            else if (endReason === 'deleted') updateSummaryProgress('stopped', `《${title}》已被删除，停止生成。`);
+            else if (endReason === 'failing') updateSummaryProgress('error', `连续 3 章失败，先停下了（成功 ${successCount} 章，还剩 ${left} 章）。${resumeTip}\n错误：${lastError}`);
+            else if (firstError) updateSummaryProgress('error', `任务完成，但有失败。成功 ${successCount}/${chaptersToGenerate.length}。${resumeTip}\n错误: ${firstError}`);
+            else updateSummaryProgress('done', `所有摘要已成功生成！(${successCount}/${chaptersToGenerate.length})`);
         };
 
         const renderBookList = () => { /* same code */
@@ -5586,7 +6371,7 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 const book = state.books[bookId];
                 const item = document.createElement('div');
                 item.className = 'book-item';
-                item.innerHTML = `<span class="book-item-title">${book.title}</span><div class="book-item-actions"><button class="reader-btn read-btn" data-book-id="${bookId}">阅读</button><button class="reader-btn delete-btn" data-book-id="${bookId}">删除</button></div>`;
+                item.innerHTML = `<span class="book-item-title">${escapeHtml(book.title)}</span><div class="book-item-actions"><button class="reader-btn read-btn" data-book-id="${escapeHtml(bookId)}">阅读</button><button class="reader-btn delete-btn" data-book-id="${escapeHtml(bookId)}">删除</button></div>`;
                 dom.bookList.appendChild(item);
             });
         };
@@ -5601,53 +6386,81 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         const hideSearchModal = () => {
             dom.searchModal.classList.remove('show');
         };
+        // 搜索结果最多列多少条。长篇里搜「的」能命中几万段，全建成 DOM 页面会直接卡死
+        const SEARCH_MAX_RESULTS = 300;
+
+        // 把命中的那一小段（关键词前后各一截）放进 el，关键词高亮。
+        // 全程用文本节点，不拼 HTML：原文里有 < > & 也原样显示，不会被当成代码。
+        // 结果框只显示两行，所以从第一处命中附近截一段，不然命中在长段落后半截时根本看不到。
+        const appendSearchSnippet = (el, text, query) => {
+            const first = text.indexOf(query);
+            const from = Math.max(0, first - 30);
+            const to = Math.min(text.length, first + query.length + 90);
+            const snippet = (from > 0 ? '…' : '') + text.slice(from, to) + (to < text.length ? '…' : '');
+            const parts = snippet.split(query);
+            parts.forEach((part, i) => {
+                if (part) el.appendChild(document.createTextNode(part));
+                if (i < parts.length - 1) {
+                    const mark = document.createElement('span');
+                    mark.className = 'highlight-text';
+                    mark.textContent = query;
+                    el.appendChild(mark);
+                }
+            });
+        };
+
         const performSearch = () => {
             const query = dom.searchInput.value.trim();
             if(!query) return;
             const activeBook = getActiveBook();
             if(!activeBook) return;
-            
-            dom.searchResultsList.innerHTML = '<div style="text-align:center;padding:10px;">搜索中...</div>';
-            
-            const results = [];
-            // Simple iteration search
-            activeBook.paragraphs.forEach((text, index) => {
-                if(text.includes(query)) {
-                    results.push({ index, text });
+            const list = dom.searchResultsList;
+            const paras = activeBook.paragraphs || [];
+            const toc = activeBook.toc || [];
+
+            // 按普通文字找（indexOf），不当正则：以前搜 ? ( * [ 会直接报错，搜 . 会把整段都标亮
+            const hits = [];
+            let total = 0;
+            for (let i = 0; i < paras.length; i++) {
+                if (paras[i] && paras[i].indexOf(query) !== -1) {
+                    total++;
+                    if (hits.length < SEARCH_MAX_RESULTS) hits.push(i);
                 }
-            });
-
-            dom.searchResultsList.innerHTML = '';
-            if(results.length === 0) {
-                dom.searchResultsList.innerHTML = '<div style="text-align:center;padding:10px;">未找到相关内容</div>';
-            } else {
-                results.forEach(res => {
-                    const item = document.createElement('div');
-                    item.className = 'search-result-item';
-                    
-                    // Highlight logic for preview
-                    const safeText = res.text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    const highlightedText = safeText.replace(new RegExp(query, 'g'), `<span class="highlight-text">${query}</span>`);
-                    
-                    // Find Chapter
-                    let chapter = '未知章节';
-                    for(let i=activeBook.toc.length-1; i>=0; i--) {
-                        if(res.index >= activeBook.toc[i].paraIndex) {
-                            chapter = activeBook.toc[i].title;
-                            break;
-                        }
-                    }
-
-                    item.innerHTML = `
-                        <div class="search-result-text">${highlightedText}</div>
-                        <div class="search-result-chapter">${chapter}</div>
-                    `;
-                    item.addEventListener('click', () => {
-                        jumpToParagraph(res.index, query);
-                    });
-                    dom.searchResultsList.appendChild(item);
-                });
             }
+
+            list.innerHTML = '';
+            const note = (text) => {
+                const d = document.createElement('div');
+                d.style.cssText = 'text-align:center;padding:10px;color:#999;font-size:13px;';
+                d.textContent = text;
+                list.appendChild(d);
+            };
+            if (!total) { note('未找到相关内容'); return; }
+            note(total > hits.length
+                ? `共找到 ${total} 处，只列出前 ${hits.length} 处。换个更具体的词能找得更准。`
+                : `共找到 ${total} 处`);
+
+            // 命中按段落顺序排、目录也按段落顺序排，往后走一遍就能对上章节，不用每条都从头找
+            let ci = -1;
+            const frag = document.createDocumentFragment();
+            hits.forEach(index => {
+                while (ci + 1 < toc.length && toc[ci + 1].paraIndex <= index) ci++;
+                const item = document.createElement('div');
+                item.className = 'search-result-item';
+                const textEl = document.createElement('div');
+                textEl.className = 'search-result-text';
+                appendSearchSnippet(textEl, paras[index], query);
+                const chapEl = document.createElement('div');
+                chapEl.className = 'search-result-chapter';
+                chapEl.textContent = ci >= 0 ? toc[ci].title : '未知章节';
+                item.appendChild(textEl);
+                item.appendChild(chapEl);
+                item.addEventListener('click', () => {
+                    jumpToParagraph(index, query);
+                });
+                frag.appendChild(item);
+            });
+            list.appendChild(frag);
         };
 
         const jumpToParagraph = (paraIndex, highlightQuery) => {
@@ -5662,74 +6475,455 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             }
         };
 
-        // NEW FEATURE: Export/Import Data —— 全量键值转储，覆盖分片存储的所有书籍/角色/批注
-        const handleExportData = async () => {
-            // 先把当前编辑与聊天/记忆/批注/进度落盘，保证导出的是最新数据
-            syncSettingsToActiveCharacter();
-            syncSettingsToActivePersona();
-            await saveCharacters();
-            await savePersonas();
-            await saveChatHistory();
-            await saveMemories();
-            if (getActiveBook()) { await saveComments(); await saveBookProgress(state.activeBookId); }
-            await localforage.setItem('readingCompanionSettings', state.settings);
+        // ===== 数据安全：长任务保护 / 备份记录 / 持久存储 =====
+        // 有长任务（批量摘要、读后感、导入备份…）在跑时，新版本接管也不自动刷新页面，
+        // 否则任务被打断：花了钱的请求白费，导入到一半更可能把数据弄坏。见底部 PWA 模块的 controllerchange。
+        let appBusyCount = 0;
+        const setAppBusy = (on) => { appBusyCount = Math.max(0, appBusyCount + (on ? 1 : -1)); };
+        window.__readerBusy = () => appBusyCount > 0;
 
-            const dump = {};
-            const keys = await localforage.keys();
-            for (const k of keys) { dump[k] = await localforage.getItem(k); }
-            const data = { __fullDump__: true, version: "5.0", data: dump };
-
-            const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `♡‧₊ ✧ ₊‧♡ 备份 ${new Date().toISOString().slice(0,10)}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
+        // 备份记录：上次导出的时间、之后有没有改过数据、提醒的冷却期。
+        // 存在 localforage 里，但不进备份文件（导出时跳过这个键）。
+        const BACKUP_META_KEY = 'backupMeta';
+        const DAY_MS = 86400000;
+        const backupGuard = { meta: { at: 0, changedAt: 0, quiet: 0 }, ready: false, paused: false };
+        // 阅读进度、上次打开的书这种高频小改动不算「有新数据要备份」
+        const NOT_A_CHANGE = /^(backupMeta$|bookprog_|lastActiveBookId$)/;
+        const saveBackupMeta = () => localforage.setItem(BACKUP_META_KEY, backupGuard.meta).catch(() => {});
+        const noteDataChange = (key) => {
+            if (!backupGuard.ready || backupGuard.paused || NOT_A_CHANGE.test(String(key))) return;
+            const m = backupGuard.meta;
+            if (m.changedAt > m.at) return;        // 上次备份后已经记过「有改动」，不用每次都写
+            m.changedAt = Math.max(Date.now(), m.at + 1);
+            saveBackupMeta();
+        };
+        // 启动流程跑完后再调用：启动时的迁移、补默认值不算用户改过数据。
+        // 必须等 localforage 选好存储驱动后再包 setItem/removeItem，
+        // 否则它初始化时会用驱动自带的方法把这层包装覆盖掉。
+        const initBackupGuard = async () => {
+            try {
+                const m = await localforage.getItem(BACKUP_META_KEY);
+                if (m && typeof m === 'object') Object.assign(backupGuard.meta, m);
+            } catch (e) { /* 读不到就当没备份过 */ }
+            try {
+                await localforage.ready();
+                const rawSet = localforage.setItem, rawRemove = localforage.removeItem;
+                localforage.setItem = function (k) { noteDataChange(k); return rawSet.apply(this, arguments); };
+                localforage.removeItem = function (k) { noteDataChange(k); return rawRemove.apply(this, arguments); };
+            } catch (e) { console.warn('[备份提醒] 初始化失败，只是少了提醒', e); }
+            backupGuard.ready = true;
+        };
+        const markBackedUp = async (at) => {
+            Object.assign(backupGuard.meta, { at: at || Date.now(), quiet: 0 });
+            await saveBackupMeta();
+        };
+        const lastBackupText = () => {
+            const at = backupGuard.meta.at;
+            if (!at) return '上次备份：还没导出过';
+            const days = Math.floor((Date.now() - at) / DAY_MS);
+            const d = new Date(at);
+            return `上次备份：${days <= 0 ? '今天' : days + ' 天前'}（${d.getMonth() + 1}月${d.getDate()}日）`;
         };
 
-        const handleImportData = (event) => {
-            const file = event.target.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const data = JSON.parse(e.target.result);
+        // 持久存储：默认浏览器只是「尽量」保留网站数据，手机空间紧张时可能整个清掉。
+        // 申请成功后就不会被自动清理。Chrome 不弹窗，按「装没装到桌面、常不常用」自己决定给不给，
+        // 所以每次启动都问一次，条件够了就拿到了。
+        const requestPersist = async () => {
+            try {
+                const st = navigator.storage;
+                if (!st || typeof st.persist !== 'function' || typeof st.persisted !== 'function') return null;
+                if (await st.persisted()) return true;
+                return !!(await st.persist());
+            } catch (e) { return null; }
+        };
+        window.__requestPersist = requestPersist;   // 装到桌面后 PWA 模块会再要一次
 
-                    if (data.__fullDump__ && data.data) {
-                        // 新版全量备份：清空后逐键恢复
-                        await localforage.clear();
-                        for (const k of Object.keys(data.data)) {
-                            await localforage.setItem(k, data.data[k]);
-                        }
-                    } else {
-                        // 兼容旧备份（3.0 / 4.0）
-                        if(data.settings) await localforage.setItem('readingCompanionSettings', data.settings);
-                        if(data.books) await localforage.setItem('books', data.books);
-                        if(data.summaries) await localforage.setItem('readingCompanionSummaries', data.summaries);
-                        await localforage.removeItem('bookIndex'); // 触发下次启动从旧 books 迁移
-                        if (data.version === "4.0" && data.characters) {
-                            await localforage.setItem('characters', data.characters);
-                            if (data.personas) await localforage.setItem('personas', data.personas);
-                            if (data.chats) { for (const cid of Object.keys(data.chats)) await localforage.setItem('chat_' + cid, data.chats[cid]); }
-                            if (data.characterMemories) { for (const cid of Object.keys(data.characterMemories)) await localforage.setItem('memories_' + cid, data.characterMemories[cid]); }
+        const fmtBytes = (n) => {
+            if (!(n >= 0)) return '?';
+            if (n < 1048576) return Math.round(n / 1024) + ' KB';
+            if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
+            return (n / 1073741824).toFixed(1) + ' GB';
+        };
+        // 设置 → 数据管理 下面那几行状态
+        const renderStorageStatus = async () => {
+            const el = document.getElementById('storage-status');
+            if (!el) return;
+            const lines = [lastBackupText() + '。'];
+            el.innerHTML = lines.join('<br>');
+            try {
+                const st = navigator.storage;
+                if (st && typeof st.estimate === 'function') {
+                    const e = await st.estimate();
+                    if (typeof e.usage === 'number') {
+                        lines.push(`这个网址下的数据已占用 ${fmtBytes(e.usage)}${e.quota ? '，浏览器给的上限约 ' + fmtBytes(e.quota) : ''}。`);
+                    }
+                }
+                if (st && typeof st.persisted === 'function') {
+                    lines.push(await st.persisted()
+                        ? '持久保存：已开启，手机清理空间时不会自动删这里的数据。'
+                        : '<span style="color:#e57373;">持久保存：未开启，手机空间紧张时浏览器可能自动清掉这里的数据，请定期导出备份。</span>装到桌面并经常打开，Chrome 一般会自动开启。');
+                }
+            } catch (e) { /* 查不到就只显示上次备份 */ }
+            el.innerHTML = lines.join('<br>');
+        };
+
+        // 备份提醒：从没备份过，或距上次备份满 7 天且期间改过数据，就在顶部弹一条提示。
+        // 提醒过一次后隔 2 天再说，不会每次打开都弹。
+        const showBackupBanner = (msg) => {
+            const old = document.getElementById('backup-reminder');
+            if (old) old.remove();
+            const bar = document.createElement('div');
+            bar.id = 'backup-reminder';
+            bar.style.cssText = 'position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top, 0px) + 12px);z-index:9998;'
+                + 'background:#fff;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,0.18);padding:12px 14px;'
+                + 'font-size:13px;line-height:1.7;color:#555;max-width:480px;margin:0 auto;';
+            const text = document.createElement('div');
+            text.textContent = msg;
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;margin-top:8px;';
+            const mk = (label, bg, color) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = label;
+                b.style.cssText = `border:none;border-radius:10px;padding:7px 14px;font-size:13px;font-family:inherit;cursor:pointer;background:${bg};color:${color};`;
+                return b;
+            };
+            const later = mk('以后再说', '#eee', '#666');
+            const now = mk('现在备份', '#a3ccc4', '#fff');
+            later.addEventListener('click', () => bar.remove());
+            now.addEventListener('click', () => { bar.remove(); handleExportData(); });
+            row.appendChild(later); row.appendChild(now);
+            bar.appendChild(text); bar.appendChild(row);
+            document.body.appendChild(bar);
+        };
+        const maybeRemindBackup = async () => {
+            const m = backupGuard.meta, now = Date.now();
+            if (m.quiet && now < m.quiet) return;
+            const hasData = Object.keys(state.books || {}).length > 0
+                || (state.chat.history || []).some(x => x && (x.sender === 'user' || x.sender === 'ai'));
+            if (!hasData) return;
+            let msg = '';
+            if (!m.at) {
+                msg = '你的书、聊天、批注和摘要都只存在这台手机的浏览器里，还没有备份过。建议导出一份存到别处。';
+            } else if (m.changedAt > m.at && now - m.at >= 7 * DAY_MS) {
+                msg = `距上次备份已经 ${Math.floor((now - m.at) / DAY_MS)} 天了，这期间数据有变化，建议再导出一份。`;
+            }
+            if (!msg) return;
+            m.quiet = now + 2 * DAY_MS;
+            await saveBackupMeta();
+            showBackupBanner(msg);
+        };
+
+        // 多选一的小弹窗（系统 confirm 只有两个按钮，说不清两个选项各自的后果）。
+        // options: [{ label, hint, value, primary }]；返回选中的 value，点取消 / 点遮罩返回 null
+        const askChoice = ({ title, body, options, cancelLabel = '取消' }) => new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;padding:20px;';
+            const card = document.createElement('div');
+            card.style.cssText = 'background:#fff;border-radius:16px;max-width:380px;width:100%;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,0.3);color:#333;font-family:inherit;max-height:90vh;overflow:auto;';
+            const h = document.createElement('h3');
+            h.style.cssText = 'margin:0 0 8px;font-size:16px;';
+            h.textContent = title;
+            card.appendChild(h);
+            if (body) {
+                const p = document.createElement('div');
+                p.style.cssText = 'font-size:13px;line-height:1.7;color:#666;white-space:pre-wrap;margin-bottom:12px;';
+                p.textContent = body;
+                card.appendChild(p);
+            }
+            const done = (v) => { overlay.remove(); resolve(v); };
+            options.forEach(opt => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.style.cssText = 'display:block;width:100%;text-align:left;margin:0 0 10px;padding:11px 13px;border-radius:12px;cursor:pointer;font-family:inherit;'
+                    + (opt.primary ? 'border:none;background:#a3ccc4;color:#fff;' : 'border:1px solid #ddd;background:#fafafa;color:#333;');
+                const l = document.createElement('div');
+                l.style.cssText = 'font-size:14px;font-weight:600;';
+                l.textContent = opt.label;
+                b.appendChild(l);
+                if (opt.hint) {
+                    const s = document.createElement('div');
+                    s.style.cssText = 'font-size:12px;line-height:1.6;margin-top:3px;opacity:0.85;';
+                    s.textContent = opt.hint;
+                    b.appendChild(s);
+                }
+                b.addEventListener('click', () => done(opt.value));
+                card.appendChild(b);
+            });
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.textContent = cancelLabel;
+            cancel.style.cssText = 'display:block;width:100%;padding:10px;border:none;border-radius:12px;background:#eee;color:#666;font-size:14px;cursor:pointer;font-family:inherit;';
+            cancel.addEventListener('click', () => done(null));
+            card.appendChild(cancel);
+            overlay.appendChild(card);
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) done(null); });
+            document.body.appendChild(overlay);
+        });
+
+        // API Key 只存在设置里这三处（接口预设只存地址和模型，不含 Key）
+        const settingsHaveKey = (s) => !!(s && (s.apiKey || s.summaryApiKey || (s.tts && s.tts.apiKey)));
+        const stripSettingsKeys = (s) => {
+            if (!s || typeof s !== 'object') return s;
+            const c = { ...s, apiKey: '', summaryApiKey: '' };
+            if (c.tts && typeof c.tts === 'object') c.tts = { ...c.tts, apiKey: '' };
+            return c;
+        };
+
+        // NEW FEATURE: Export/Import Data —— 全量键值转储，覆盖分片存储的所有书籍/角色/批注
+        const handleExportData = async () => {
+            try {
+                // 先把当前编辑与聊天/记忆/批注/进度落盘，保证导出的是最新数据
+                syncSettingsToActiveCharacter();
+                syncSettingsToActivePersona();
+                await saveCharacters();
+                await savePersonas();
+                await saveChatHistory();
+                await saveMemories();
+                if (getActiveBook()) { await saveComments(); await saveBookProgress(state.activeBookId); }
+                await localforage.setItem('readingCompanionSettings', state.settings);
+
+                // 备份里要不要带 API Key：以前一律带上，文件一旦发给别人、传到网盘，Key 就跟着泄露了
+                let withKey = false;
+                if (settingsHaveKey(state.settings)) {
+                    const pick = await askChoice({
+                        title: '备份里要不要带 API Key？',
+                        body: '书籍、聊天、批注、摘要、读后感、角色和其它设置两种都会导出，只差 Key。',
+                        options: [
+                            { value: 'no', label: '不带 Key（推荐）', hint: '更安全。导入时如果接口地址跟那台设备一样，会保留那台设备原来填的 Key，否则重新填一次就行。', primary: true },
+                            { value: 'yes', label: '带上 Key', hint: '换手机后不用重新填。但这个文件就等于你的钥匙，别发给别人、别传到网盘或公开仓库。' },
+                        ],
+                        cancelLabel: '先不导出',
+                    });
+                    if (pick === null) return;
+                    withKey = pick === 'yes';
+                }
+
+                // 一个键一个键地读、一个键一个键地转成文字，每攒够约 4MB 就封成一个小 Blob 交给浏览器保管。
+                // 以前是把所有书的全文先拼成一个几十 MB 的大字符串，书多了手机内存顶不住，会卡死或下载失败。
+                // 拼出来的还是同一种 JSON，老版本也能导入。
+                const parts = [];
+                let batch = [], batchLen = 0;
+                const push = (s) => {
+                    batch.push(s); batchLen += s.length;
+                    if (batchLen > 4000000) { parts.push(new Blob(batch)); batch = []; batchLen = 0; }
+                };
+                push(JSON.stringify({ __fullDump__: true, version: "5.0", exportedAt: new Date().toISOString(), hasKey: withKey }).slice(0, -1) + ',"data":{');
+                const keys = await localforage.keys();
+                let first = true;
+                for (const k of keys) {
+                    if (k === BACKUP_META_KEY) continue;   // 备份记录是这台设备自己的，不进备份文件
+                    let v = await localforage.getItem(k);
+                    if (k === 'readingCompanionSettings' && !withKey) v = stripSettingsKeys(v);
+                    const json = v === undefined ? undefined : JSON.stringify(v);
+                    if (json === undefined) continue;
+                    push((first ? '' : ',') + JSON.stringify(k) + ':' + json);
+                    first = false;
+                }
+                push('}}');
+                parts.push(new Blob(batch));
+                batch = null;
+
+                const blob = new Blob(parts, { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `♡‧₊ ✧ ₊‧♡ 备份 ${new Date().toISOString().slice(0,10)}.json`;
+                a.click();
+                // 文件大时手机要过一会儿才开始写盘，地址立刻作废可能导致下载失败
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+                await markBackedUp();
+                renderStorageStatus();
+                addSystemMessage(`已导出备份（${fmtBytes(blob.size)}，${withKey ? '含 API Key，注意保管' : '不含 API Key'}）`, true);
+            } catch (err) {
+                console.error(err);
+                alert('导出失败：' + ((err && err.message) || err) + '\n本机数据没有改动，可以稍后再试。');
+            }
+        };
+
+        const readFileText = (file) => (typeof file.text === 'function')
+            ? file.text()
+            : new Promise((res, rej) => {
+                const r = new FileReader();
+                r.onload = () => res(r.result);
+                r.onerror = () => rej(r.error);
+                r.readAsText(file);
+            });
+
+        // 判断是不是本 App 的备份，并数一下里面有什么（给确认框用）。不是就返回 null。
+        const inspectBackup = (data) => {
+            const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+            if (!isObj(data)) return null;
+            if (data.__fullDump__) {
+                if (!isObj(data.data)) return null;
+                const d = data.data;
+                const keys = Object.keys(d);
+                const ours = keys.some(k =>
+                    /^(readingCompanionSettings|bookIndex|characters|personas|readingCompanionSummaries|readingCompanionReflections)$/.test(k)
+                    || /^(book_|bookprog_|chat_|comments_|memories_)/.test(k));
+                if (!ours) return null;
+                return {
+                    kind: 'full',
+                    books: Array.isArray(d.bookIndex) ? d.bookIndex.length : keys.filter(k => /^book_/.test(k)).length,
+                    chars: (d.characters && Array.isArray(d.characters.list)) ? d.characters.list.length : 0,
+                    msgs: keys.filter(k => /^chat_/.test(k)).reduce((n, k) => n + (Array.isArray(d[k]) ? d[k].length : 0), 0),
+                    at: Date.parse(data.exportedAt) || 0,
+                    // 新版备份会写明带没带 Key；老备份没有这个字段，当作不知道
+                    hasKey: data.hasKey === true ? true : (data.hasKey === false ? false : null),
+                };
+            }
+            // 别的 App 的备份（比如私享衣橱的带 app 字段）一律不认
+            if (data.app) return null;
+            if (isObj(data.settings) || isObj(data.books)) {
+                return {
+                    kind: 'legacy',
+                    books: isObj(data.books) ? Object.keys(data.books).length : 0,
+                    chars: (data.characters && Array.isArray(data.characters.list)) ? data.characters.list.length : 0,
+                    msgs: 0,
+                    at: 0,
+                };
+            }
+            return null;
+        };
+
+        // 导入失败、连回滚也失败时的最后一道保险：把导入前的数据直接下载成备份文件
+        const downloadRescueFile = (snapshot) => {
+            try {
+                const blob = new Blob([JSON.stringify({ __fullDump__: true, version: "5.0", exportedAt: new Date().toISOString(), data: snapshot })], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `♡‧₊ ✧ ₊‧♡ 导入前的数据 ${new Date().toISOString().slice(0,10)}.json`;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+                return true;
+            } catch (e) { return false; }
+        };
+
+        const handleImportData = async (event) => {
+            const file = event.target.files[0];
+            event.target.value = '';
+            if (!file) return;
+
+            let data;
+            try {
+                data = JSON.parse(await readFileText(file));
+            } catch (err) {
+                alert('读不出这个文件：它不是 JSON，或者已经损坏了。\n本机数据没有改动。');
+                return;
+            }
+            const info = inspectBackup(data);
+            if (!info) {
+                alert('这个文件不是「♡‧₊ ✧ ₊‧♡」的备份（可能是别的 App 导出的），没有导入。\n本机数据没有改动。');
+                return;
+            }
+
+            const keepTip = '如果现在的数据还想留着，请先点「取消」，用「导出数据」备份一份再导入。';
+            const what = `${info.books} 本书` + (info.chars ? `、${info.chars} 个角色` : '') + (info.msgs ? `、${info.msgs} 条聊天记录` : '');
+            const when = info.at ? `（导出于 ${new Date(info.at).toLocaleDateString()}）` : '';
+            const keyNote = info.hasKey === false ? '\n\n这份备份不含 API Key：接口地址跟这台设备一样的，会保留这台设备现在填的 Key。' : '';
+            const question = info.kind === 'full'
+                ? `这份备份里有：${what}${when}。\n\n导入会先清空这台设备上现有的全部书籍、聊天、批注、摘要、读后感和设置，再换成备份里的内容。${keyNote}\n\n${keepTip}\n\n确定导入吗？`
+                : `这是旧版本的备份（${info.books} 本书）。\n\n导入会用它替换这台设备上的设置、书架、章节摘要、角色和聊天记录，现在书架上的书会看不到。\n\n${keepTip}\n\n确定导入吗？`;
+            if (!confirm(question)) return;
+
+            setAppBusy(true);
+            backupGuard.paused = true;
+
+            // 先把现在的数据在内存里留一份：写到一半出错（比如空间不够）就原样放回去，不会落得两头空
+            let snapshot;
+            try {
+                snapshot = {};
+                const keys = await localforage.keys();
+                for (const k of keys) snapshot[k] = await localforage.getItem(k);
+            } catch (err) {
+                console.error(err);
+                backupGuard.paused = false;
+                setAppBusy(false);
+                alert('读取本机现有数据失败，为了安全这次没有导入。\n本机数据没有改动。');
+                return;
+            }
+
+            let keyResult = '';
+            try {
+                if (info.kind === 'full') {
+                    // 新版全量备份：清空后逐键恢复
+                    await localforage.clear();
+                    for (const k of Object.keys(data.data)) {
+                        if (k === BACKUP_META_KEY) continue;
+                        await localforage.setItem(k, data.data[k]);
+                    }
+                    // 备份里没带 Key：接口地址跟这台设备一样的，把这台设备原来的 Key 放回去，免得导完就连不上。
+                    // 地址不一样的不放：别家接口的 Key 填过去也用不了。
+                    if (info.hasKey === false) {
+                        const local = snapshot.readingCompanionSettings;
+                        const imported = data.data.readingCompanionSettings;
+                        if (local && typeof local === 'object' && imported && typeof imported === 'object') {
+                            const norm = (u) => String(u || '').trim().replace(/\/+$/, '');
+                            const patched = { ...imported };
+                            let kept = 0, missing = 0;
+                            const take = (has, sameUrl, apply) => { if (has) { if (sameUrl) { apply(); kept++; } else missing++; } };
+                            take(!!local.apiKey, norm(local.apiUrl) === norm(imported.apiUrl), () => { patched.apiKey = local.apiKey; });
+                            take(!!local.summaryApiKey, norm(local.summaryApiUrl) === norm(imported.summaryApiUrl), () => { patched.summaryApiKey = local.summaryApiKey; });
+                            const lt = local.tts || {}, it = imported.tts || {};
+                            take(!!lt.apiKey, norm(lt.apiUrl) === norm(it.apiUrl), () => { patched.tts = { ...it, apiKey: lt.apiKey }; });
+                            if (kept) await localforage.setItem('readingCompanionSettings', patched);
+                            keyResult = kept && !missing ? '\n\n备份里没带 API Key，已保留这台设备原来填的 Key。'
+                                : (kept ? '\n\n备份里没带 API Key：接口地址相同的已保留原来的 Key，其余请到设置里重新填写。'
+                                        : '\n\n备份里没带 API Key，请到设置里重新填写。');
                         } else {
-                            await localforage.removeItem('characters');
-                            await localforage.removeItem('personas');
-                            if(data.chat) await localforage.setItem('readingCompanionChat', data.chat.history || data.chat);
-                            if(data.memories) await localforage.setItem('readingCompanionMemories', data.memories);
+                            keyResult = '\n\n备份里没带 API Key，请到设置里重新填写。';
                         }
                     }
-
-                    alert('数据导入成功，即将刷新页面...');
-                    location.reload();
-                } catch(err) {
-                    alert('导入失败，文件格式可能不正确');
-                    console.error(err);
+                    // 刚按备份还原，本机数据就等于那份备份，记成「已备份」，免得一打开就催
+                    backupGuard.meta = { at: info.at || Date.now(), changedAt: 0, quiet: 0 };
+                    await localforage.setItem(BACKUP_META_KEY, backupGuard.meta);
+                } else {
+                    // 兼容旧备份（3.0 / 4.0）
+                    if(data.settings) await localforage.setItem('readingCompanionSettings', data.settings);
+                    if(data.books) await localforage.setItem('books', data.books);
+                    if(data.summaries) await localforage.setItem('readingCompanionSummaries', data.summaries);
+                    await localforage.removeItem('bookIndex'); // 触发下次启动从旧 books 迁移
+                    if (data.version === "4.0" && data.characters) {
+                        await localforage.setItem('characters', data.characters);
+                        if (data.personas) await localforage.setItem('personas', data.personas);
+                        if (data.chats) { for (const cid of Object.keys(data.chats)) await localforage.setItem('chat_' + cid, data.chats[cid]); }
+                        if (data.characterMemories) { for (const cid of Object.keys(data.characterMemories)) await localforage.setItem('memories_' + cid, data.characterMemories[cid]); }
+                    } else {
+                        await localforage.removeItem('characters');
+                        await localforage.removeItem('personas');
+                        if(data.chat) await localforage.setItem('readingCompanionChat', data.chat.history || data.chat);
+                        if(data.memories) await localforage.setItem('readingCompanionMemories', data.memories);
+                    }
+                    // 旧备份只换了一部分数据，跟任何一份备份都对不上了，记成「有改动」
+                    backupGuard.meta.changedAt = Math.max(Date.now(), backupGuard.meta.at + 1);
+                    await localforage.setItem(BACKUP_META_KEY, backupGuard.meta);
                 }
-            };
-            reader.readAsText(file);
-            event.target.value = '';
+            } catch (err) {
+                console.error(err);
+                let restored = false;
+                try {
+                    await localforage.clear();
+                    for (const k of Object.keys(snapshot)) await localforage.setItem(k, snapshot[k]);
+                    restored = true;
+                } catch (e2) { console.error(e2); }
+                backupGuard.paused = false;
+                setAppBusy(false);
+                const why = (err && err.name === 'QuotaExceededError') ? '存储空间不够' : ((err && err.message) || '未知原因');
+                if (restored) {
+                    alert(`导入失败（${why}），已经把数据恢复成导入前的样子。`);
+                    location.reload();
+                } else {
+                    const saved = downloadRescueFile(snapshot);
+                    alert(`导入失败（${why}），而且没能完全恢复原来的数据。\n\n`
+                        + (saved ? '导入前的数据已经下载成一个备份文件（文件名带「导入前的数据」），之后可以用「导入数据」把它导回来。'
+                                 : '请先不要关闭页面，马上用你之前导出的备份重新导入。'));
+                }
+                return;
+            }
+
+            alert('数据导入成功，即将刷新页面...' + keyResult);
+            location.reload();
         };
 
         // Handlers for new inputs
@@ -6035,6 +7229,46 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 toggleTOC(false);
             }
         });
+
+        // ---- 书签 / 夜间模式 / 屏幕常亮 ----
+        document.querySelectorAll('.toc-tab').forEach(t => t.addEventListener('click', (e) => { e.stopPropagation(); setTocTab(t.dataset.tab); }));
+        const bookmarkListEl = document.getElementById('bookmark-list');
+        if (bookmarkListEl) bookmarkListEl.addEventListener('click', async (e) => {
+            const li = e.target.closest('li.bm-item');
+            const book = getActiveBook();
+            if (!li || !book) return;
+            const list = await getBookmarks(book.id);
+            const idx = list.findIndex(b => b.id === li.dataset.bmId);
+            if (idx < 0) return;
+            if (e.target.closest('.bm-del')) {
+                list.splice(idx, 1);
+                try { await saveBookmarks(book.id); } catch (err) { flashTip('删除没保存成功，再试一次'); }
+                renderBookmarkList();
+                refreshBookmarkBtn();
+                return;
+            }
+            const b = list[idx];
+            const total = (book.paragraphs || []).length;
+            const para = Math.max(0, Math.min(b.para || 0, Math.max(0, total - 1)));
+            scrollToPara(para, { offset: (!isFlipMode() && para === b.para) ? (b.offset || 0) : 0 });
+            toggleTOC(false);
+            setTimeout(updateReadingProgress, 60);
+        });
+        const rnavBookmarkBtn = document.getElementById('rnav-bookmark-btn');
+        if (rnavBookmarkBtn) rnavBookmarkBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleBookmarkHere(); });
+        const rnavNightBtn = document.getElementById('rnav-night-btn');
+        if (rnavNightBtn) rnavNightBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleNightMode(); });
+        const moreBookmarksBtn = document.getElementById('bookmarks-btn');
+        if (moreBookmarksBtn) moreBookmarksBtn.addEventListener('click', () => {
+            if (!getActiveBook()) { addSystemMessage('请先打开一本书'); return; }
+            hideReaderNav();
+            toggleTOC(true, 'bookmarks');
+        });
+        const moreNightBtn = document.getElementById('night-mode-btn');
+        if (moreNightBtn) moreNightBtn.addEventListener('click', () => toggleNightMode());
+        // 碰屏幕、滚动都算「还在看」，屏幕常亮的闲置计时重新开始
+        ['touchstart', 'pointerdown', 'scroll', 'wheel'].forEach(ev =>
+            dom.readerContentWrapper.addEventListener(ev, ScreenAwake.activity, { passive: true }));
         
         [dom.readerBgColor, dom.readerFontColor, dom.readerCommentColor, dom.readerUserCommentColor, dom.readerFontSize, dom.readerLineHeight, dom.readerPadding].forEach(el => el.addEventListener('input', updateThemePreview));
         dom.readerContentWrapper.addEventListener('scroll', handleReaderScroll);
@@ -6073,6 +7307,14 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         dom.summaryModal.addEventListener('click', (e) => { if (e.target === dom.summaryModal) hideSummaryModal(); });
         dom.summaryList.addEventListener('click', (e) => { if (e.target.classList.contains('ai-gen-btn')) { const btn = e.target; generateSummaryForChapter(btn.dataset.chapterTitle, parseInt(btn.dataset.paraIndex, 10)); } });
         dom.summaryProgressToggle.addEventListener('click', () => { dom.summaryProgressModal.classList.toggle('collapsed'); });
+        const summaryStopBtn = document.getElementById('summary-progress-stop');
+        if (summaryStopBtn) summaryStopBtn.addEventListener('click', () => {
+            if (!summaryJob.running) return;
+            // 正在请求的这一章会等它回来并存好，然后停下
+            summaryJob.stop = true;
+            summaryStopBtn.disabled = true;
+            summaryStopBtn.textContent = '正在停止…';
+        });
         if (dom.generateAllSummariesBtn) dom.generateAllSummariesBtn.addEventListener('click', async () => {
             const activeBook = getActiveBook();
             if (!activeBook) { addSystemMessage('请先加载一本书籍'); return; }
@@ -6103,6 +7345,13 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
             if (state.activeBookId) { await ensureBookLoaded(state.activeBookId); await loadCommentsForActiveBook(); }
             dom.readerProgressContainer.style.display = 'none';
             displayBookContent();
+
+            // 数据安全：启动流程跑完再开始记录改动；申请持久存储
+            await initBackupGuard();
+            requestPersist().catch(() => {});
+            // 从文件管理器分享 TXT 进来的，先导入；这次没有分享才过几秒看要不要提醒备份，免得两件事挤在一起
+            const shared = await takeSharedBooks().catch(e => { console.warn('[分享] 导入失败', e); return false; });
+            if (!shared) setTimeout(() => { maybeRemindBackup().catch(() => {}); }, 4000);
         };
 
         initializeApp();
@@ -6149,6 +7398,9 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
                 navigator.serviceWorker.addEventListener('controllerchange', () => {
                     if (reloadedOnce) return;
                     reloadedOnce = true;
+                    // 有长任务（批量生成摘要、写读后感、导入备份）在跑时不刷新：
+                    // 刷新会打断任务，导入到一半甚至会把数据弄坏。新版本下次打开时自然生效。
+                    if (typeof window.__readerBusy === 'function' && window.__readerBusy()) return;
                     location.reload();
                 });
             });
@@ -6198,6 +7450,8 @@ ${state.settings.userName || '我'}正读到并关注这句话: "${quote}"
         window.addEventListener('appinstalled', () => {
             deferredPrompt = null;
             installBtn.style.display = 'none';
+            // 装到桌面后 Chrome 一般就肯给持久存储了，趁热再要一次
+            if (typeof window.__requestPersist === 'function') window.__requestPersist();
         });
 
         /* ===== 环境检测 ===== */

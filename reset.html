@@ -15,6 +15,13 @@
   安全性：默认只注销 Service Worker + 删除 Cache Storage（网页缓存），
   不会动 IndexedDB，所以你的书籍、聊天记录、设置都不会丢。
   代码全部使用最保守的 ES5 写法，确保任何浏览器都能执行。
+
+  只动自己的东西：
+    GitHub Pages 上同一个账号的所有项目共用一个网址（xxx.github.io），浏览器把它们当成同一个网站，
+    Service Worker、缓存、数据库、localStorage 都在一起。以前「修复」和「彻底重置」是一锅端，
+    会把同网址下其它 App（比如私享衣橱）的后台脚本、离线缓存，甚至全部数据一起删掉。
+    现在只认：作用域等于本目录的 Service Worker、peiban-reader- 开头的缓存、
+    localforage 数据库、以及本 App 自己用到的 localStorage 键。
 -->
 <style>
   html,body{margin:0;padding:0;background:#e0eee8;color:#333;
@@ -61,7 +68,8 @@
     <h2>还是不行？最后手段</h2>
     <div class="warn">
       下面这个按钮会连同 <b>书籍、聊天记录、设置</b> 一起全部删除，属于彻底重置。
-      只有在上面的修复无效时才用。
+      只有在上面的修复无效时才用。<br>
+      只删本阅读器自己的数据，同一网址下的其它 App 不受影响。
     </div>
     <div class="sp"></div>
     <button class="btn danger" id="nukeBtn">彻底重置（会删除所有数据）</button>
@@ -87,6 +95,16 @@
     return new Promise(function (r) { setTimeout(r, ms); });
   }
 
+  /* ---------------- 哪些东西算「本 App 的」 ---------------- */
+  // 本 App 所在目录，也就是 sw.js 的作用域，形如 https://xxx.github.io/reader/
+  var APP_DIR = location.href.split(/[?#]/)[0].replace(/[^\/]*$/, '');
+  var CACHE_PREFIX = 'peiban-reader-';          // 跟 sw.js 里的 CACHE_PREFIX 一致
+  var DB_NAMES = ['localforage'];               // 书籍 / 聊天 / 设置都在 localforage 的默认库里
+  function isMySW(r) { return r && r.scope === APP_DIR; }
+  function isMyCache(k) { return String(k).indexOf(CACHE_PREFIX) === 0; }
+  // localforage 降级到 localStorage 时的键前缀，加上本 App 直接用到的键
+  function isMyLsKey(k) { return /^localforage\//.test(k) || k === 'iosInstallHintDismissed'; }
+
   /* ---------------- 诊断 ---------------- */
   function diagnose() {
     reset();
@@ -103,14 +121,17 @@
         for (var i = 0; i < rs.length; i++) {
           var sc = rs[i].scope;
           var w = rs[i].active || rs[i].waiting || rs[i].installing;
-          log('  · 作用域 ' + sc + (w && w.scriptURL ? ('\n    脚本 ' + w.scriptURL) : ''));
+          log('  · 作用域 ' + sc + (isMySW(rs[i]) ? '（本 App）' : '（其它 App，不会动）')
+            + (w && w.scriptURL ? ('\n    脚本 ' + w.scriptURL) : ''));
         }
       }, function () { log('  读取 SW 列表失败', 'bad'); }));
     }
 
     if (window.caches && caches.keys) {
       jobs.push(caches.keys().then(function (keys) {
-        log('缓存桶：' + (keys.length ? keys.join('、') : '（无）'));
+        log('缓存桶：' + (keys.length ? keys.map(function (k) {
+          return k + (isMyCache(k) ? '（本 App）' : '（其它 App，不会动）');
+        }).join('、') : '（无）'));
       }, function () { log('  读取缓存失败', 'bad'); }));
     }
 
@@ -145,15 +166,16 @@
 
     var steps = Promise.resolve();
 
-    // 1) 注销所有 Service Worker
+    // 1) 注销本 App 的 Service Worker（同网址下其它 App 的不动）
     steps = steps.then(function () {
       if (!('serviceWorker' in navigator) || !navigator.serviceWorker.getRegistrations) {
         log('· 该浏览器不支持 Service Worker，跳过');
         return;
       }
       return navigator.serviceWorker.getRegistrations().then(function (rs) {
-        if (!rs.length) { log('· 没有需要注销的 Service Worker'); return; }
-        return Promise.all(rs.map(function (r) {
+        var mine = rs.filter(isMySW);
+        if (!mine.length) { log('· 没有需要注销的 Service Worker'); return; }
+        return Promise.all(mine.map(function (r) {
           return r.unregister().then(function (ok) {
             log('· 注销 ' + r.scope + ' → ' + (ok ? '成功' : '失败'), ok ? 'ok' : 'bad');
           });
@@ -161,10 +183,11 @@
       });
     });
 
-    // 2) 删除所有 Cache Storage
+    // 2) 删除本 App 的网页缓存
     steps = steps.then(function () {
       if (!(window.caches && caches.keys)) { log('· 该浏览器不支持 Cache Storage，跳过'); return; }
       return caches.keys().then(function (keys) {
+        keys = keys.filter(isMyCache);
         if (!keys.length) { log('· 没有需要清除的缓存'); return; }
         return Promise.all(keys.map(function (k) {
           return caches.delete(k).then(function (ok) {
@@ -209,35 +232,39 @@
 
     var steps = Promise.resolve();
 
+    // 下面每一步都只动本 App 自己的东西：同一个 xxx.github.io 下的其它 App（比如私享衣橱）
+    // 跟这里共用网站存储，以前这里会把它们的数据一起删光。
     steps = steps.then(function () {
       if (!('serviceWorker' in navigator) || !navigator.serviceWorker.getRegistrations) return;
       return navigator.serviceWorker.getRegistrations().then(function (rs) {
-        return Promise.all(rs.map(function (r) { return r.unregister(); }));
+        return Promise.all(rs.filter(isMySW).map(function (r) { return r.unregister(); }));
       }).then(function () { log('· Service Worker 已注销', 'ok'); });
     });
 
     steps = steps.then(function () {
       if (!(window.caches && caches.keys)) return;
       return caches.keys().then(function (keys) {
-        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+        return Promise.all(keys.filter(isMyCache).map(function (k) { return caches.delete(k); }));
       }).then(function () { log('· 网页缓存已清除', 'ok'); });
     });
 
     steps = steps.then(function () {
-      try { localStorage.clear(); sessionStorage.clear(); log('· 本地存储已清除', 'ok'); } catch (e) {}
+      try {
+        var doomed = [];
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && isMyLsKey(k)) doomed.push(k);
+        }
+        for (var j = 0; j < doomed.length; j++) localStorage.removeItem(doomed[j]);
+        log('· 本地存储已清除（' + doomed.length + ' 项）', 'ok');
+      } catch (e) {}
     });
 
-    // 删除 IndexedDB（书籍 / 聊天 / 设置都在这里）
+    // 删除 IndexedDB（书籍 / 聊天 / 设置都在 localforage 库里）
     steps = steps.then(function () {
       if (!window.indexedDB) return;
-      var known = ['localforage', 'peiban-reader', 'keyvaluepairs'];
-      var listing = (indexedDB.databases)
-        ? indexedDB.databases().then(function (ds) {
-            return ds.map(function (d) { return d.name; }).filter(Boolean);
-          }).catch(function () { return known; })
-        : Promise.resolve(known);
-
-      return listing.then(function (names) {
+      var names = DB_NAMES.slice();
+      return Promise.resolve().then(function () {
         if (!names.length) { log('· 没有找到数据库'); return; }
         return Promise.all(names.map(function (n) {
           return new Promise(function (done) {
